@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="VideoItem" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContent" />
+    <field id="focusPercent" type="float" onChange="onFocus" />
+    <field id="rowListHasFocus" type="boolean" onChange="onFocus" />
+  </interface>
+  <children>
+    <Group id="card" scaleRotateCenter="[280,157]">
+      <Rectangle id="ring" translation="[-3,-3]" width="566" height="321" color="0xFFFFFFFF" opacity="0" />
+      <Rectangle width="560" height="315" color="0x19191AFF" />
+      <Poster id="poster" width="560" height="315" loadDisplayMode="scaleToZoom" />
+      <Rectangle id="badgeBg" translation="[468,275]" width="80" height="28" color="0x000000A0" />
+      <Label id="dur" translation="[468,275]" width="80" height="28" horizAlign="center" vertAlign="center" color="0xFFFFFFFF">
+        <Font role="font" uri="font:SystemFontFile" size="18" />
+      </Label>
+    </Group>
+    <Label id="title" translation="[0,334]" width="560" wrap="true" maxLines="2" lineSpacing="2" color="0xB8BBC0FF">
+      <Font role="font" uri="font:SystemFontFile" size="24" />
+    </Label>
+    <Label id="meta" translation="[0,398]" width="560" color="0x6F7378FF">
+      <Font role="font" uri="font:SystemFontFile" size="19" />
+    </Label>
+  </children>
+  <script type="text/brightscript"><![CDATA[
+    sub onContent()
+      c = m.top.itemContent
+      if c = invalid then return
+      m.top.findNode("poster").uri = c.HDPosterUrl
+      m.top.findNode("title").text = c.title
+      m.top.findNode("meta").text = c.description
+      d = c.ShortDescriptionLine2
+      m.top.findNode("dur").text = d
+      m.top.findNode("badgeBg").visible = d <> ""
+    end sub
+    sub onFocus()
+      f = m.top.focusPercent
+      if not m.top.rowListHasFocus then f = 0
+      m.top.findNode("ring").opacity = f
+      s = 1 + 0.04 * f
+      m.top.findNode("card").scale = [s, s]
+      if f > 0.5 then m.top.findNode("title").color = "0xFFFFFFFF" else m.top.findNode("title").color = "0xB8BBC0FF"
+    end sub
+  ]]></script>
+</component>

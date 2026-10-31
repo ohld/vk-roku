@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+  <interface>
+    <field id="externalToken" type="string" onChange="onExternalToken" />
+    <field id="externalSearch" type="string" onChange="onExternalSearch" />
+  </interface>
+  <children>
+    <Rectangle color="0x0A0A0AFF" width="1920" height="1080" />
+    <Group id="tabs" translation="[96,52]" />
+    <Rectangle id="underline" translation="[96,100]" width="0" height="3" color="0x0077FFFF" />
+    <Label text="VK Видео" translation="[1520,52]" width="304" horizAlign="right" color="0x6F7378FF">
+      <Font role="font" uri="font:SystemFontFile" size="26" />
+    </Label>
+    <Label id="status" translation="[96,560]" width="1728" horizAlign="center" color="0x6F7378FF">
+      <Font role="font" uri="font:SystemFontFile" size="26" />
+    </Label>
+    <RowList id="rows" translation="[96,150]" itemComponentName="VideoItem" numRows="2"
+      itemSize="[1728,456]" rowItemSize="[[560,315]]" rowItemSpacing="[[24,0]]" itemSpacing="[0,0]"
+      showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
+      drawFocusFeedback="false" />
+    <Video id="video" width="1920" height="1080" visible="false" />
+  </children>
+  <script type="text/brightscript" uri="Config.brs" />
+  <script type="text/brightscript" uri="MainScene.brs" />
+</component>

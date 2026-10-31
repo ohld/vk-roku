@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ApiTask" extends="Task">
+  <interface>
+    <field id="url" type="string" />
+    <field id="tag" type="string" />
+    <field id="params" type="assocarray" />
+    <field id="result" type="assocarray" />
+  </interface>
+  <script type="text/brightscript"><![CDATA[
+    sub init()
+      m.top.functionName = "run"
+    end sub
+    sub run()
+      ut = CreateObject("roUrlTransfer")
+      ut.SetCertificatesFile("common:/certs/ca-bundle.crt")
+      ut.InitClientCertificates()
+      ut.RetainBodyOnError(true)
+      ut.AddHeader("User-Agent", "KateMobileAndroid/109.1 lite-550 (Android 13; SDK 33; arm64-v8a; Google Pixel; ru)")
+      url = m.top.url
+      sep = "?"
+      p = m.top.params
+      if p <> invalid then
+        for each k in p
+          url = url + sep + k + "=" + ut.Escape(p[k].toStr())
+          sep = "&"
+        end for
+      end if
+      ut.SetUrl(url)
+      body = ut.GetToString()
+      data = ParseJson(body)
+      if data = invalid then data = {error: {error_msg: "network/parse error"}}
+      m.top.result = {tag: m.top.tag, data: data}
+    end sub
+  ]]></script>
+</component>
