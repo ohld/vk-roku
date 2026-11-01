@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- one key of the on-screen keyboard (Roku keyboards have no Cyrillic) -->
+<component name="KeyItem" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContent" />
+    <field id="focusPercent" type="float" onChange="onFocus" />
+    <field id="gridHasFocus" type="boolean" onChange="onFocus" />
+  </interface>
+  <children>
+    <Rectangle id="bg" width="72" height="64" color="0x1E1F21FF" />
+    <Label id="lbl" width="72" height="64" horizAlign="center" vertAlign="center" color="0xE1E3E6FF">
+      <Font role="font" uri="font:SystemFontFile" size="28" />
+    </Label>
+  </children>
+  <script type="text/brightscript"><![CDATA[
+    sub onContent()
+      t = m.top.itemContent.title
+      l = m.top.findNode("lbl")
+      l.text = t
+      if t.len() > 3 then l.font.size = 15
+    end sub
+    sub onFocus()
+      on = m.top.gridHasFocus and m.top.focusPercent > 0.5
+      if on then
+        m.top.findNode("bg").color = "0xFFFFFFFF"
+        m.top.findNode("lbl").color = "0x0A0A0AFF"
+      else
+        m.top.findNode("bg").color = "0x1E1F21FF"
+        m.top.findNode("lbl").color = "0xE1E3E6FF"
+      end if
+    end sub
+  ]]></script>
+</component>

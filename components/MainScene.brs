@@ -14,9 +14,33 @@ sub init()
     m.tabLabels = m.top.findNode("tabs").getChildren(-1, 0)
     m.cache = {}
     m.rows.observeField("rowItemSelected", "onPick")
+    m.searchG = m.top.findNode("search")
+    m.kb = m.top.findNode("kb")
+    m.srows = m.top.findNode("srows")
+    m.shint = m.top.findNode("shint")
+    m.queryLbl = m.top.findNode("query")
+    m.searchTimer = m.top.findNode("searchTimer")
+    m.srows.observeField("rowItemSelected", "onPick")
+    m.kb.observeField("itemSelected", "onKey")
+    m.searchTimer.observeField("fire", "runSearch")
+    m.q = ""
+    m.lang = "ru"
+    fillKb()
+    m.list = m.rows
     m.video.observeField("state", "onVideoState")
+    m.video.observeField("position", "onPos")
+    m.osd = m.top.findNode("osd")
+    m.osdTimer = m.top.findNode("osdTimer")
+    m.seekTimer = m.top.findNode("seekTimer")
+    m.holdTimer = m.top.findNode("holdTimer")
+    m.osdTimer.observeField("fire", "hideOsd")
+    m.seekTimer.observeField("fire", "commitSeek")
+    m.holdTimer.observeField("fire", "onHold")
+    m.target = -1
+    m.holdDir = 0
     m.tab = 0
-    m.inTabs = false
+    toTabs()            ' keys work while the first page loads
+    m.autoGrid = true   ' ...then focus drops into the grid unless the user already moved
     openTab(0)
 end sub
 
@@ -54,7 +78,7 @@ end sub
 sub toTabs()
     m.inTabs = true
     paintTabs()
-    m.top.setFocus(true)
+    m.top.findNode("tabs").setFocus(true)   ' Scene.setFocus leaves focus on the child
 end sub
 
 ' message instead of the grid; focus goes to tabs so the remote never dead-ends
@@ -67,8 +91,11 @@ end sub
 sub openTab(i)
     m.tab = i
     paintTabs()
+    m.searchG.visible = (i = 2)
+    m.rows.visible = (i <> 2)
+    m.status.visible = (i <> 2)
     if i = 2 then
-        askSearch()
+        m.task = invalid   ' drop late section pages
     else if m.cache.doesExist(i.toStr()) then
         showGrid(m.cache[i.toStr()], "")
     else
@@ -86,6 +113,42 @@ sub call(method, params, tag)
     t.observeField("result", "onResult")
     m.task = t
     t.control = "run"
+end sub
+
+' VK calls whose answer we don't need (view telemetry)
+sub fire(method, params)
+    t = CreateObject("roSGNode", "ApiTask")
+    params.v = "5.199"
+    params.access_token = m.token
+    t.url = m.relay + "https://api.vk.com/method/" + method
+    t.params = params
+    t.control = "run"
+    if m.bg = invalid or m.bg.count() > 8 then m.bg = []
+    m.bg.push(t)   ' keep references while they run
+end sub
+
+' what the official app sends: history record on start, watched ranges on exit
+sub viewStart()
+    m.ranges = []
+    m.segStart = -1
+    m.started = CreateObject("roDateTime").AsSeconds()
+    fire("video.addViewingHistoryRecord", {video_id: m.cur.owner_id.toStr() + "_" + m.cur.id.toStr()})
+end sub
+
+sub segEnd()
+    if m.segStart < 0 then return
+    e = Int(m.video.position)
+    if e > m.segStart then m.ranges.push(m.segStart.toStr() + "-" + e.toStr())
+    m.segStart = -1
+end sub
+
+sub viewEnd()
+    segEnd()
+    if m.ranges = invalid or m.ranges.count() = 0 then return
+    p = {owner_id: m.cur.owner_id, video_id: m.cur.id, ranges: m.ranges.join(","), start_time: m.started, state_start: "fullscreen", state_end: "fullscreen", end_stream_reason: "session_end", autoplay: 0}
+    if m.cur.track_code <> invalid then p.track_code = m.cur.track_code
+    fire("video.viewSegments", p)
+    m.ranges = []
 end sub
 
 sub loadSection(i)
@@ -106,7 +169,14 @@ sub onResult(e)
     if not e.getRoSGNode().isSameNode(m.task) then return
     r = e.getData()
     d = r.data
+    if d.error <> invalid and r.tag = "sec" and m.acc.count() > 0 then
+        d = {response: {}}   ' a later page failed: show what we have
+    end if
     if d.error <> invalid then
+        if r.tag = "search" then
+            m.shint.text = d.error.error_msg
+            return
+        end if
         showMessage("Ошибка ВК: " + d.error.error_msg)
         return
     end if
@@ -133,7 +203,10 @@ sub onResult(e)
             showGrid(vids, "Здесь пока пусто")
         end if
     else
-        showGrid(playable(resp.items), "Ничего не найдено: " + m.query)
+        vids = playable(resp.items)
+        m.srows.content = cards(vids, 2)
+        m.shint.text = ""
+        if vids.count() = 0 then m.shint.text = "Ничего не найдено"
     end if
 end sub
 
@@ -144,9 +217,21 @@ sub showGrid(vids, emptyMsg)
         return
     end if
     m.status.text = ""
+    m.rows.content = cards(vids, 3)
+    m.rows.jumpToRowItem = [0, 0]
+    if m.autoGrid then
+        m.autoGrid = false
+        m.inTabs = false
+        paintTabs()
+    end if
+    if not m.inTabs then m.rows.setFocus(true)
+end sub
+
+' rows of perRow cards; each card node carries its VK video object in field "v"
+function cards(vids, perRow)
     root = CreateObject("roSGNode", "ContentNode")
     for i = 0 to vids.count() - 1
-        if i mod 3 = 0 then row = root.createChild("ContentNode")
+        if i mod perRow = 0 then row = root.createChild("ContentNode")
         v = vids[i]
         n = row.createChild("ContentNode")
         n.HDPosterUrl = thumb(v)
@@ -155,10 +240,8 @@ sub showGrid(vids, emptyMsg)
         n.ShortDescriptionLine2 = dur(v.duration)
         n.addFields({v: v})
     end for
-    m.rows.content = root
-    m.rows.jumpToRowItem = [0, 0]
-    if not m.inTabs then m.rows.setFocus(true)
-end sub
+    return root
+end function
 
 function playable(vids)
     out = []
@@ -210,37 +293,60 @@ function thumb(v) as string
 end function
 
 ' ---------- search ----------
-sub askSearch()
-    d = CreateObject("roSGNode", "StandardKeyboardDialog")
-    d.title = "Поиск видео ВК"
-    d.buttons = ["Найти", "Отмена"]
-    d.observeField("buttonSelected", "onSearchDialog")
-    m.top.dialog = d
+' Roku keyboards have no Cyrillic, so the search tab has its own grid keyboard; results refresh 0.8 s after typing
+sub fillKb()
+    keys = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("")
+    if m.lang = "en" then keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split("")
+    keys.append(["Пробел", "Стереть", "ABC"])
+    if m.lang = "en" then keys[keys.count() - 1] = "АБВ"
+    c = CreateObject("roSGNode", "ContentNode")
+    for each k in keys
+        c.createChild("ContentNode").title = k
+    end for
+    m.kb.content = c
 end sub
 
-sub onSearchDialog()
-    d = m.top.dialog
-    txt = d.text
-    ok = d.buttonSelected = 0
-    d.close = true
-    if not ok or txt = "" then
-        toTabs()
+sub onKey()
+    k = m.kb.content.getChild(m.kb.itemSelected).title
+    if k = "ABC" or k = "АБВ" then
+        if m.lang = "ru" then m.lang = "en" else m.lang = "ru"
+        fillKb()
+        m.kb.jumpToItem = m.kb.content.getChildCount() - 1
         return
+    else if k = "Стереть" then
+        if m.q.len() > 0 then m.q = m.q.left(m.q.len() - 1)
+    else if k = "Пробел" then
+        m.q = m.q + " "
+    else
+        m.q = m.q + LCase(k)
     end if
-    m.query = txt
-    m.rows.content = invalid
+    m.queryLbl.text = m.q
+    m.searchTimer.control = "stop"
+    m.searchTimer.control = "start"
+end sub
+
+sub runSearch()
+    q = m.q.trim()
+    if q = "" then return
+    m.shint.text = "Поиск…"
+    m.srows.content = invalid
+    call("video.search", {q: q, count: 60, adult: 0, sort: 2}, "search")
+end sub
+
+sub focusKb()
     m.inTabs = false
     paintTabs()
-    m.status.text = "Поиск: " + txt + "…"
-    call("video.search", {q: txt, count: 120, adult: 0, sort: 2}, "search")
+    m.kb.setFocus(true)
 end sub
 
 ' ---------- playback: 1080p, drop to 720p after 2 real rebuffers; never below 720p (user requirement) ----------
-sub onPick()
-    sel = m.rows.rowItemSelected
-    m.cur = m.rows.content.getChild(sel[0]).getChild(sel[1]).v
+sub onPick(e)
+    m.list = e.getRoSGNode()
+    sel = m.list.rowItemSelected
+    m.cur = m.list.content.getChild(sel[0]).getChild(sel[1]).v
     k = "mp4_720"
     if m.cur.files.mp4_1080 <> invalid then k = "mp4_1080"
+    viewStart()
     play(k, 0)
 end sub
 
@@ -253,15 +359,117 @@ sub play(k, startAt)
     c.streamFormat = "mp4"
     c.title = m.cur.title
     c.bookmarkPosition = startAt
+    segEnd()
     m.video.control = "stop"
     m.video.content = c
     m.video.visible = true
-    m.video.setFocus(true)
+    m.osd.setFocus(true)   ' keys go to our controls, not the Video node (it eats presses even with enableUI=false)
     m.video.control = "play"
+    m.target = -1
+    m.top.findNode("osdTitle").text = m.cur.title
+    showOsd()
 end sub
+
+' Own player controls (native trickplay UI is off): OK = pause/resume at once,
+' left/right = seek 10 s at once, hold = accelerating scrub; loading starts 0.6 s after the last press, no OK needed.
+sub showOsd()
+    m.osd.visible = true
+    drawOsd()
+    m.osdTimer.control = "stop"
+    m.osdTimer.control = "start"
+end sub
+
+sub hideOsd()
+    if m.video.state = "paused" or m.target >= 0 then return
+    m.osd.visible = false
+end sub
+
+sub drawOsd()
+    p = m.target
+    if p < 0 then p = m.video.position
+    d = m.video.duration
+    w = 0
+    if d > 0 then w = Int(1728 * p / d)
+    m.top.findNode("osdFill").width = w
+    m.top.findNode("osdPos").text = clock(p)
+    m.top.findNode("osdDur").text = clock(d)
+    icon = ""
+    if m.video.state = "paused" then icon = "Пауза"
+    if m.video.state = "buffering" then icon = "Загрузка…"
+    m.top.findNode("osdIcon").text = icon
+end sub
+
+function clock(sec) as string
+    t = dur(Int(sec))
+    if t = "" then t = "0:00"
+    return t
+end function
+
+sub onPos()
+    if m.osd.visible and m.target < 0 then drawOsd()
+end sub
+
+sub nudge(d)
+    if m.target < 0 then m.target = m.video.position
+    m.target = m.target + d
+    if m.target < 0 then m.target = 0
+    if m.video.duration > 0 and m.target > m.video.duration - 5 then m.target = m.video.duration - 5
+    m.seekTimer.control = "stop"
+    showOsd()
+end sub
+
+sub onHold()
+    m.holdN = m.holdN + 1
+    stepSec = 10 * (1 + Int(m.holdN / 2))
+    if stepSec > 120 then stepSec = 120
+    nudge(m.holdDir * stepSec)
+end sub
+
+sub commitSeek()
+    if m.target < 0 then return
+    segEnd()   ' close the watched range before position jumps
+    m.prev = ""   ' a seek's buffering is not a stall
+    m.video.seek = m.target
+    m.target = -1
+    showOsd()
+end sub
+
+function playerKey(key, press) as boolean
+    dir = 0
+    if key = "right" or key = "fastforward" then dir = 1
+    if key = "left" or key = "rewind" then dir = -1
+    if not press then
+        if dir <> 0 then
+            m.holdTimer.control = "stop"
+            m.holdDir = 0
+            m.seekTimer.control = "start"
+        end if
+        return dir <> 0
+    end if
+    if key = "back" then
+        closeVideo()
+    else if key = "OK" or key = "play" then
+        if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
+        showOsd()
+    else if dir <> 0 then
+        if m.holdDir = dir then return true   ' key auto-repeat while held
+        m.holdDir = dir
+        m.holdN = 0
+        nudge(dir * 10)
+        m.holdTimer.control = "start"
+    else
+        showOsd()
+    end if
+    return true
+end function
 
 sub onVideoState()
     st = m.video.state
+    if st = "playing" then
+        if m.segStart < 0 then m.segStart = Int(m.video.position)
+    else
+        segEnd()
+    end if
     ' count only stalls during playback; trickplay goes paused -> buffering and must not downgrade quality
     if st = "buffering" and m.prev = "playing" then
         m.rebuf = m.rebuf + 1
@@ -276,39 +484,32 @@ sub onVideoState()
         closeVideo()
     end if
     m.prev = st
+    if m.osd.visible then drawOsd()
 end sub
 
 sub closeVideo()
+    viewEnd()
     m.video.control = "stop"
     m.video.visible = false
-    if m.rows.content <> invalid then m.rows.setFocus(true) else toTabs()
+    m.osd.visible = false
+    m.holdTimer.control = "stop"
+    m.seekTimer.control = "stop"
+    m.target = -1
+    if m.list.content <> invalid then m.list.setFocus(true) else toTabs()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
+    if m.video.visible then return playerKey(key, press)
     if not press then return false
-    if m.video.visible then
-        if key = "back" then
-            closeVideo()
-            return true
-        else if key = "OK" then
-            if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
-            return true
-        else if key = "left" or key = "right" then
-            d = 10
-            if key = "left" then d = -10
-            m.video.seek = m.video.position + d
-            return true
-        end if
-        return false
-    end if
     if m.inTabs then
+        m.autoGrid = false
         if key = "back" then return false   ' let Back exit the app from the tab bar
         if key = "left" and m.tab > 0 then
             openTab(m.tab - 1)
         else if key = "right" and m.tab < 2 then
             openTab(m.tab + 1)
-        else if key = "OK" and m.tab = 2 then
-            askSearch()
+        else if (key = "OK" or key = "down") and m.tab = 2 then
+            focusKb()
         else if key = "down" and m.rows.content <> invalid then
             m.inTabs = false
             paintTabs()
@@ -316,7 +517,23 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     end if
-    if m.rows.hasFocus() and (key = "back" or (key = "up" and m.rows.rowItemFocused[0] = 0)) then
+    if m.kb.hasFocus() then
+        if key = "up" or key = "back" then
+            toTabs()
+        else if key = "right" and m.srows.content <> invalid then
+            m.srows.setFocus(true)
+        end if
+        return true
+    end if
+    if m.srows.hasFocus() then
+        if key = "left" or key = "back" then
+            m.kb.setFocus(true)
+        else if key = "up" then
+            toTabs()
+        end if
+        return true
+    end if
+    if m.rows.hasFocus() and (key = "back" or key = "up")   ' up reaches us only when the RowList is already on its top row then
         toTabs()
         return true
     end if

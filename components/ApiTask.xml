@@ -11,23 +11,34 @@
       m.top.functionName = "run"
     end sub
     sub run()
-      ut = CreateObject("roUrlTransfer")
-      ut.SetCertificatesFile("common:/certs/ca-bundle.crt")
-      ut.InitClientCertificates()
-      ut.RetainBodyOnError(true)
       url = m.top.url
       sep = "?"
       p = m.top.params
+      esc = CreateObject("roUrlTransfer")
       if p <> invalid then
         for each k in p
-          url = url + sep + k + "=" + ut.Escape(p[k].toStr())
+          url = url + sep + k + "=" + esc.Escape(p[k].toStr())
           sep = "&"
         end for
       end if
-      ut.SetUrl(url)
-      body = ut.GetToString()
-      data = ParseJson(body)
-      if data = invalid then data = {error: {error_msg: "network/parse error"}}
+      ' VK API sometimes stalls for 30+ s: give each attempt 10 s, up to 3 attempts
+      data = invalid
+      for attempt = 1 to 3
+        ut = CreateObject("roUrlTransfer")
+        ut.SetCertificatesFile("common:/certs/ca-bundle.crt")
+        ut.InitClientCertificates()
+        ut.RetainBodyOnError(true)
+        ut.SetUrl(url)
+        port = CreateObject("roMessagePort")
+        ut.SetMessagePort(port)
+        if ut.AsyncGetToString() then
+          msg = wait(10000, port)
+          if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then data = ParseJson(msg.GetString())
+          if msg = invalid then ut.AsyncCancel()
+        end if
+        if data <> invalid then exit for
+      end for
+      if data = invalid then data = {error: {error_msg: "ВК не отвечает, попробуйте ещё раз"}}
       m.top.result = {tag: m.top.tag, data: data}
     end sub
   ]]></script>

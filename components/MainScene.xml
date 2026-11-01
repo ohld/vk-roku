@@ -21,7 +21,40 @@
       itemSize="[1728,456]" rowItemSize="[[560,315]]" rowItemSpacing="[[24,0]]" itemSpacing="[0,0]"
       showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
       drawFocusFeedback="false" />
-    <Video id="video" width="1920" height="1080" visible="false" />
+    <Group id="search" visible="false">
+      <Rectangle translation="[96,150]" width="540" height="64" color="0x1E1F21FF" />
+      <Label id="query" translation="[116,150]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
+        <Font role="font" uri="font:SystemFontFile" size="30" />
+      </Label>
+      <MarkupGrid id="kb" translation="[96,234]" itemComponentName="KeyItem" numColumns="7" numRows="7"
+        itemSize="[72,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
+      <RowList id="srows" translation="[680,150]" itemComponentName="VideoItem" numRows="2"
+        itemSize="[1144,456]" rowItemSize="[[560,315]]" rowItemSpacing="[[24,0]]" itemSpacing="[0,0]"
+        showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
+        drawFocusFeedback="false" />
+      <Label id="shint" translation="[680,500]" width="1144" horizAlign="center" color="0x6F7378FF"
+        text="Наберите запрос — результаты появятся здесь">
+        <Font role="font" uri="font:SystemFontFile" size="26" />
+      </Label>
+    </Group>
+    <Timer id="searchTimer" duration="0.8" />
+    <Video id="video" width="1920" height="1080" visible="false" enableUI="false" />
+    <Group id="osd" visible="false">
+      <Rectangle translation="[0,860]" width="1920" height="220" color="0x000000B0" />
+      <Label id="osdTitle" translation="[96,890]" width="1500" maxLines="1" color="0xFFFFFFFF">
+        <Font role="font" uri="font:SystemFontFile" size="32" />
+      </Label>
+      <Label id="osdIcon" translation="[1624,890]" width="200" horizAlign="right" color="0xFFFFFFFF">
+        <Font role="font" uri="font:SystemFontFile" size="32" />
+      </Label>
+      <Rectangle translation="[96,962]" width="1728" height="6" color="0xFFFFFF40" />
+      <Rectangle id="osdFill" translation="[96,962]" width="0" height="6" color="0x0077FFFF" />
+      <Label id="osdPos" translation="[96,984]" color="0xFFFFFFFF"><Font role="font" uri="font:SystemFontFile" size="26" /></Label>
+      <Label id="osdDur" translation="[1524,984]" width="300" horizAlign="right" color="0xB8BBC0FF"><Font role="font" uri="font:SystemFontFile" size="26" /></Label>
+    </Group>
+    <Timer id="osdTimer" duration="4" />
+    <Timer id="seekTimer" duration="0.6" />
+    <Timer id="holdTimer" duration="0.3" repeat="true" />
   </children>
   <script type="text/brightscript" uri="Config.brs" />
   <script type="text/brightscript" uri="MainScene.brs" />
