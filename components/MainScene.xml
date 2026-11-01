@@ -17,9 +17,9 @@
     <Label id="status" translation="[96,520]" width="1728" horizAlign="center" wrap="true" lineSpacing="12" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
-    <!-- grid: 96 px side margins, 3 cards of 544x416 with 48 px gutters; 2 full rows fit above y=1024 -->
-    <RowList id="rows" translation="[96,144]" itemComponentName="VideoItem" numRows="2"
-      itemSize="[1728,416]" rowItemSize="[[544,416]]" rowItemSpacing="[[48,0]]" itemSpacing="[0,48]"
+    <!-- grid: 96 px side margins, 3 cards of 544x416 with 48 px gutters (items carry 6 px halo padding); 2 rows fit above y=1024 -->
+    <RowList id="rows" translation="[90,138]" itemComponentName="VideoItem" numRows="2"
+      itemSize="[1740,428]" rowItemSize="[[556,428]]" rowItemSpacing="[[36,0]]" itemSpacing="[0,36]"
       showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
       drawFocusFeedback="false" />
     <Group id="skel" translation="[96,144]" visible="false" />
@@ -31,16 +31,16 @@
       <Label id="qph" translation="[116,144]" width="500" height="64" vertAlign="center" color="0x6F7378FF" text="Поиск видео">
         <Font role="font" uri="font:SystemFontFile" size="30" />
       </Label>
-      <MarkupGrid id="kb" translation="[96,224]" itemComponentName="KeyItem" numColumns="7" numRows="7"
-        itemSize="[72,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
+      <MarkupGrid id="kb" translation="[96,224]" itemComponentName="KeyItem" numColumns="6" numRows="7"
+        itemSize="[85,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
       <!-- search history from VK (catalog.getVideoSearch), under the keyboard -->
       <Label id="recentHdr" translation="[96,668]" text="Недавние" visible="false" color="0x6F7378FF">
         <Font role="font" uri="font:SystemFontFile" size="22" />
       </Label>
       <MarkupGrid id="recent" translation="[96,708]" itemComponentName="RecentItem" numColumns="1" numRows="6"
         itemSize="[540,48]" itemSpacing="[0,4]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
-      <RowList id="srows" translation="[688,144]" itemComponentName="VideoItem" numRows="2"
-        itemSize="[1136,416]" rowItemSize="[[544,416]]" rowItemSpacing="[[48,0]]" itemSpacing="[0,48]"
+      <RowList id="srows" translation="[682,138]" itemComponentName="VideoItem" numRows="2"
+        itemSize="[1148,428]" rowItemSize="[[556,428]]" rowItemSpacing="[[36,0]]" itemSpacing="[0,36]"
         showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
         drawFocusFeedback="false" />
       <Group id="sskel" translation="[688,144]" visible="false" />

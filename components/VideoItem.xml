@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- 544x416 card: 16:9 poster 544x306, title 2 lines max, meta on a fixed line. Grid gutters are 48 px both ways. -->
+<!-- 556x428 item = 544x416 card + 6 px halo padding; 16:9 poster 544x306, title 2 lines max, meta on a fixed line. Grid gutters are 48 px both ways. -->
 <component name="VideoItem" extends="Group">
   <interface>
     <field id="itemContent" type="node" onChange="onContent" />
@@ -8,19 +8,28 @@
     <field id="rowHasFocus" type="boolean" onChange="onFocus" />
   </interface>
   <children>
-    <Rectangle id="ring" translation="[-4,-4]" width="552" height="314" color="0xFFFFFFFF" opacity="0" />
-    <Rectangle width="544" height="306" color="0x19191AFF" />
-    <Poster id="poster" width="544" height="306" loadDisplayMode="scaleToZoom" />
-    <Rectangle id="badgeBg" translation="[456,266]" width="76" height="28" color="0x000000B0" />
-    <Label id="dur" translation="[456,266]" width="76" height="28" horizAlign="center" vertAlign="center" color="0xFFFFFFFF">
-      <Font role="font" uri="font:SystemFontFile" size="18" />
-    </Label>
-    <Label id="title" translation="[0,326]" width="544" wrap="true" maxLines="2" lineSpacing="0" color="0xB8BBC0FF">
-      <Font role="font" uri="font:SystemFontFile" size="24" />
-    </Label>
-    <Label id="meta" translation="[0,384]" width="544" color="0x6F7378FF">
-      <Font role="font" uri="font:SystemFontFile" size="19" />
-    </Label>
+    <!-- 6 px padding inside the item so the focus halo is not clipped by the RowList -->
+    <Group translation="[6,6]">
+      <Rectangle width="544" height="306" color="0x19191AFF" />
+      <Poster id="poster" width="544" height="306" loadDisplayMode="scaleToZoom" />
+      <Rectangle id="badgeBg" translation="[456,266]" width="76" height="28" color="0x000000B0" />
+      <Label id="dur" translation="[456,266]" width="76" height="28" horizAlign="center" vertAlign="center" color="0xFFFFFFFF">
+        <Font role="font" uri="font:SystemFontFile" size="18" />
+      </Label>
+      <!-- focus: 4 px halo, 2 px outside the poster on all four sides -->
+      <Group id="ring" opacity="0">
+        <Rectangle translation="[-6,-6]" width="556" height="4" color="0xFFFFFFFF" />
+        <Rectangle translation="[-6,308]" width="556" height="4" color="0xFFFFFFFF" />
+        <Rectangle translation="[-6,-2]" width="4" height="310" color="0xFFFFFFFF" />
+        <Rectangle translation="[546,-2]" width="4" height="310" color="0xFFFFFFFF" />
+      </Group>
+      <Label id="title" translation="[0,326]" width="544" wrap="true" maxLines="2" lineSpacing="0" color="0xB8BBC0FF">
+        <Font role="font" uri="font:SystemFontFile" size="24" />
+      </Label>
+      <Label id="meta" translation="[0,384]" width="544" color="0x6F7378FF">
+        <Font role="font" uri="font:SystemFontFile" size="19" />
+      </Label>
+    </Group>
   </children>
   <script type="text/brightscript"><![CDATA[
     sub onContent()

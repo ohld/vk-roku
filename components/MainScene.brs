@@ -12,6 +12,7 @@ sub init()
     m.video = m.top.findNode("video")
     m.underline = m.top.findNode("underline")
     m.tabLabels = m.top.findNode("tabs").getChildren(-1, 0)
+    m.spaces = CreateObject("roRegex", "\s+", "")
     m.rows.observeField("rowItemSelected", "onPick")
     m.rows.observeField("rowItemFocused", "onRowFocus")
     m.skel = m.top.findNode("skel")
@@ -49,6 +50,7 @@ sub init()
     toTabs()            ' keys work while the first page loads
     m.autoGrid = true   ' ...then focus drops into the grid unless the user already moved
     resetSections()
+    loadHistory()   ' ready before the search tab is opened
     openTab(0)
 end sub
 
@@ -84,6 +86,7 @@ sub onTokens()
     end if
     m.reg.Flush()
     resetSections()
+    loadHistory()   ' ready before the search tab is opened
     openTab(0)
 end sub
 
@@ -304,7 +307,7 @@ end function
 function card(v)
     n = CreateObject("roSGNode", "ContentNode")
     n.HDPosterUrl = thumb(v)
-    n.title = v.title
+    n.title = clean(v.title)
     n.description = meta(v)
     n.ShortDescriptionLine2 = dur(v.duration)
     n.addFields({v: v})
@@ -349,15 +352,30 @@ function meta(v) as string
     return t + " просмотров"
 end function
 
+' smallest unpadded image that covers the 544 px card (VK also sends letterboxed "with_padding" variants)
 function thumb(v) as string
-    if v.image <> invalid and v.image.count() > 0 then
-        best = v.image[0]
-        for each im in v.image
-            if im.width <= 1280 and im.width > best.width then best = im
-        end for
-        return best.url
-    end if
-    return ""
+    if v.image = invalid then return ""
+    best = invalid
+    for each im in v.image
+        if im.with_padding = invalid and (best = invalid or (best.width < 544 and im.width > best.width) or (im.width >= 544 and im.width < best.width)) then best = im
+    end for
+    if best = invalid and v.image.count() > 0 then best = v.image[v.image.count() - 1]
+    if best = invalid then return ""
+    return best.url
+end function
+
+' Drop characters the Roku system font has no glyph for (emoji, pictographs, flags, variation selectors,
+' zero-width joiners) so titles never show empty boxes; keep Latin, Cyrillic, Greek, general punctuation,
+' currency and letterlike symbols (№, ™).
+function clean(t) as string
+    if t = invalid then return ""
+    out = ""
+    for i = 1 to Len(t)
+        ch = Mid(t, i, 1)
+        c = Asc(ch)
+        if c >= 32 and c < &h2190 and not (c >= &h200B and c <= &h200F) and not (c >= &h2028 and c <= &h206F and c <> &h2030 and c <> &h2039 and c <> &h203A) then out = out + ch else out = out + " "   ' a dropped emoji often separates two words
+    end for
+    return m.spaces.ReplaceAll(out, " ").Trim()
 end function
 
 ' ---------- search ----------
@@ -372,6 +390,12 @@ sub fillKb()
         c.createChild("ContentNode").title = k
     end for
     m.kb.content = c
+    ' history list starts under the last key row (RU 6 rows, EN 7) and fills the space down to y=1020
+    rows = Int((keys.count() + 5) / 6)
+    y = 224 + rows * 70 + 24
+    m.top.findNode("recentHdr").translation = [96, y]
+    m.recent.translation = [96, y + 40]
+    m.recent.numRows = Int((1020 - y - 40 + 4) / 52)
 end sub
 
 sub onKey()
@@ -409,7 +433,7 @@ sub showHistory(d)
     c = CreateObject("roSGNode", "ContentNode")
     if d.response <> invalid and d.response.suggestions <> invalid then
         for each sg in d.response.suggestions
-            if c.getChildCount() < 8 and sg.type = "recent" and sg.title <> invalid then c.createChild("ContentNode").title = sg.title
+            if c.getChildCount() < 8 and sg.type = "recent" and sg.title <> invalid then c.createChild("ContentNode").title = clean(sg.title)
         end for
     end if
     has = c.getChildCount() > 0
@@ -478,7 +502,7 @@ sub play(k, startAt)
     m.osd.setFocus(true)   ' keys go to our controls, not the Video node (it eats presses even with enableUI=false)
     m.video.control = "play"
     m.target = -1
-    m.top.findNode("osdTitle").text = m.cur.title
+    m.top.findNode("osdTitle").text = clean(m.cur.title)
     showOsd()
 end sub
 
@@ -500,7 +524,8 @@ end sub
 sub drawOsd()
     p = m.target
     if p < 0 then p = m.video.position
-    d = m.video.duration
+    d = m.cur.duration   ' VK knows it up front; Video.duration still holds the previous video while loading
+    if d = invalid or d = 0 then d = m.video.duration
     w = 0
     if d > 0 then w = Int(1728 * p / d)
     m.top.findNode("osdFill").width = w

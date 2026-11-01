@@ -7,8 +7,8 @@
     <field id="gridHasFocus" type="boolean" onChange="onFocus" />
   </interface>
   <children>
-    <Rectangle id="bg" width="72" height="64" color="0x1E1F21FF" />
-    <Label id="lbl" width="72" height="64" horizAlign="center" vertAlign="center" color="0xE1E3E6FF">
+    <Rectangle id="bg" width="85" height="64" color="0x1E1F21FF" />
+    <Label id="lbl" width="85" height="64" horizAlign="center" vertAlign="center" color="0xE1E3E6FF">
       <Font role="font" uri="font:SystemFontFile" size="28" />
     </Label>
   </children>
@@ -17,7 +17,7 @@
       t = m.top.itemContent.title
       l = m.top.findNode("lbl")
       l.text = t
-      if t.len() > 3 then l.font.size = 17
+      if t.len() > 3 then l.font.size = 20 else l.font.size = 28   ' items are reused across RU/EN layouts
     end sub
     sub onFocus()
       on = m.top.gridHasFocus and m.top.focusPercent > 0.5
