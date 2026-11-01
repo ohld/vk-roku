@@ -12,8 +12,13 @@ sub init()
     m.video = m.top.findNode("video")
     m.underline = m.top.findNode("underline")
     m.tabLabels = m.top.findNode("tabs").getChildren(-1, 0)
-    m.cache = {}
     m.rows.observeField("rowItemSelected", "onPick")
+    m.rows.observeField("rowItemFocused", "onRowFocus")
+    m.skel = m.top.findNode("skel")
+    m.sskel = m.top.findNode("sskel")
+    m.pulse = m.top.findNode("pulse")
+    drawSkel(m.skel, 3)
+    drawSkel(m.sskel, 2)
     m.searchG = m.top.findNode("search")
     m.kb = m.top.findNode("kb")
     m.srows = m.top.findNode("srows")
@@ -41,7 +46,28 @@ sub init()
     m.tab = 0
     toTabs()            ' keys work while the first page loads
     m.autoGrid = true   ' ...then focus drops into the grid unless the user already moved
+    resetSections()
     openTab(0)
+end sub
+
+' 2 rows of placeholder cards with the VideoItem geometry
+sub drawSkel(g, cols)
+    for i = 0 to cols * 2 - 1
+        x = (i mod cols) * 592
+        y = Int(i / cols) * 464
+        for each r in [[0, 0, 544, 306], [0, 332, 420, 20], [0, 360, 280, 20], [0, 390, 160, 16]]
+            b = g.createChild("Rectangle")
+            b.translation = [x + r[0], y + r[1]]
+            b.width = r[2]
+            b.height = r[3]
+            b.color = "0x19191AFF"
+        end for
+    end for
+end sub
+
+sub setLoading(g, on)
+    g.visible = on
+    if m.skel.visible or m.sskel.visible then m.pulse.control = "start" else m.pulse.control = "stop"
 end sub
 
 sub onTokens()
@@ -55,7 +81,7 @@ sub onTokens()
         m.reg.Write("stoken", t.stoken)
     end if
     m.reg.Flush()
-    m.cache = {}
+    resetSections()
     openTab(0)
 end sub
 
@@ -83,6 +109,7 @@ end sub
 
 ' message instead of the grid; focus goes to tabs so the remote never dead-ends
 sub showMessage(t)
+    setLoading(m.skel, false)
     m.rows.content = invalid
     m.status.text = t
     toTabs()
@@ -94,16 +121,15 @@ sub openTab(i)
     m.searchG.visible = (i = 2)
     m.rows.visible = (i <> 2)
     m.status.visible = (i <> 2)
-    if i = 2 then
-        m.task = invalid   ' drop late section pages
-    else if m.cache.doesExist(i.toStr()) then
-        showGrid(m.cache[i.toStr()], "")
-    else
-        loadSection(i)
+    setLoading(m.skel, false)
+    if i < 2 then
+        s = m.sec[i]
+        if s.root.getChildCount() = 0 then loadMore(i)   ' retry after an error
+        showSection(i)
     end if
 end sub
 
-sub call(method, params, tag)
+function call(method, params, tag)
     t = CreateObject("roSGNode", "ApiTask")
     params.v = "5.199"
     if tag = "search" then params.access_token = m.stoken else params.access_token = m.token
@@ -111,9 +137,9 @@ sub call(method, params, tag)
     t.params = params
     t.tag = tag
     t.observeField("result", "onResult")
-    m.task = t
     t.control = "run"
-end sub
+    return t
+end function
 
 ' VK calls whose answer we don't need (view telemetry)
 sub fire(method, params)
@@ -151,80 +177,109 @@ sub viewEnd()
     m.ranges = []
 end sub
 
-sub loadSection(i)
+' Both catalog tabs load in parallel from startup. Each section shows its first page (~4-7 videos) at once,
+' then keeps paging in the background up to 36 videos, and loads further pages when the user nears the end.
+sub resetSections()
+    m.sec = []
+    for i = 0 to 1
+        m.sec.push({root: CreateObject("roSGNode", "ContentNode"), seen: {}, n: 0, nf: "", done: false, task: invalid, err: ""})
+        loadMore(i)
+    end for
+end sub
+
+sub loadMore(i)
+    s = m.sec[i]
+    if s.task <> invalid or s.done or m.token = "" then return
+    p = {section_id: m.sections[i]}
+    if s.nf <> "" then p.start_from = s.nf
+    s.err = ""
+    s.task = call("catalog.getSection", p, "sec" + i.toStr())
+end sub
+
+sub onRowFocus()
+    if m.tab < 2 and m.rows.content <> invalid and m.rows.rowItemFocused[0] >= m.rows.content.getChildCount() - 2 then loadMore(m.tab)
+end sub
+
+sub onSection(i, d)
+    s = m.sec[i]
+    s.task = invalid
+    if d.error <> invalid then
+        s.err = "Ошибка ВК: " + d.error.error_msg   ' a later page failed: keep what we have, retry on scroll
+    else
+        resp = d.response
+        if resp = invalid then resp = {}
+        vids = playable(resp.videos)
+        for each v in vids
+            k = v.owner_id.toStr() + "_" + v.id.toStr()
+            if not s.seen.doesExist(k) then
+                s.seen[k] = true
+                addCard(s, v)
+            end if
+        end for
+        s.nf = ""
+        if resp.section <> invalid and resp.section.next_from <> invalid then s.nf = resp.section.next_from
+        s.done = (s.nf = "")
+        if s.n < 36 then loadMore(i)
+    end if
+    if m.tab = i then showSection(i)
+end sub
+
+' grid of 3-card rows, appended in place so focus and scroll survive new pages
+sub addCard(s, v)
+    if s.n mod 3 = 0 then s.root.createChild("ContentNode")
+    s.root.getChild(s.root.getChildCount() - 1).appendChild(card(v))
+    s.n = s.n + 1
+end sub
+
+sub showSection(i)
+    s = m.sec[i]
     if m.token = "" then
         showMessage("Нет входа в ВК")
-        return
+    else if s.n > 0 then
+        m.status.text = ""
+        setLoading(m.skel, false)
+        if m.rows.content = invalid or not m.rows.content.isSameNode(s.root) then
+            m.rows.content = s.root
+            m.rows.jumpToRowItem = [0, 0]
+        end if
+        if m.autoGrid then
+            m.autoGrid = false
+            m.inTabs = false
+            paintTabs()
+        end if
+        if not m.inTabs then m.rows.setFocus(true)
+    else if s.task <> invalid then
+        m.rows.content = invalid
+        m.status.text = ""
+        setLoading(m.skel, true)
+    else if s.err <> "" then
+        showMessage(s.err)
+    else
+        showMessage("Здесь пока пусто")
     end if
-    m.rows.content = invalid
-    m.status.text = "Загрузка…"
-    m.secIdx = i
-    m.acc = []
-    m.seen = {}
-    call("catalog.getSection", {section_id: m.sections[i]}, "sec")
 end sub
 
 sub onResult(e)
-    ' only the latest request counts: results of a request superseded by a tab switch / new search are dropped
-    if not e.getRoSGNode().isSameNode(m.task) then return
     r = e.getData()
+    if r.tag <> "search" then
+        i = r.tag.right(1).toInt()
+        ' drop pages of a section that was reset (new tokens) meanwhile
+        if m.sec[i].task <> invalid and e.getRoSGNode().isSameNode(m.sec[i].task) then onSection(i, r.data)
+        return
+    end if
+    ' only the latest search counts
+    if not e.getRoSGNode().isSameNode(m.task) then return
+    setLoading(m.sskel, false)
     d = r.data
-    if d.error <> invalid and r.tag = "sec" and m.acc.count() > 0 then
-        d = {response: {}}   ' a later page failed: show what we have
-    end if
     if d.error <> invalid then
-        if r.tag = "search" then
-            m.shint.text = d.error.error_msg
-            return
-        end if
-        showMessage("Ошибка ВК: " + d.error.error_msg)
+        m.shint.text = d.error.error_msg
         return
     end if
-    resp = d.response
-    if resp = invalid then resp = {}
-    if r.tag = "sec" then
-        vids = resp.videos
-        if vids = invalid then vids = []
-        for each v in vids
-            k = v.owner_id.toStr() + "_" + v.id.toStr()
-            if not m.seen.doesExist(k) then
-                m.seen[k] = true
-                m.acc.push(v)
-            end if
-        end for
-        nf = invalid
-        if resp.section <> invalid then nf = resp.section.next_from
-        ' VK returns ~5 videos per page; fetch pages until 36
-        if nf <> invalid and nf <> "" and m.acc.count() < 36 then
-            call("catalog.getSection", {section_id: m.sections[m.secIdx], start_from: nf}, "sec")
-        else
-            vids = playable(m.acc)
-            m.cache[m.secIdx.toStr()] = vids
-            showGrid(vids, "Здесь пока пусто")
-        end if
-    else
-        vids = playable(resp.items)
-        m.srows.content = cards(vids, 2)
-        m.shint.text = ""
-        if vids.count() = 0 then m.shint.text = "Ничего не найдено"
-    end if
-end sub
-
-' 3 cards per row, 2 rows visible; each card node carries its VK video object in field "v"
-sub showGrid(vids, emptyMsg)
-    if vids.count() = 0 then
-        showMessage(emptyMsg)
-        return
-    end if
-    m.status.text = ""
-    m.rows.content = cards(vids, 3)
-    m.rows.jumpToRowItem = [0, 0]
-    if m.autoGrid then
-        m.autoGrid = false
-        m.inTabs = false
-        paintTabs()
-    end if
-    if not m.inTabs then m.rows.setFocus(true)
+    vids = []
+    if d.response <> invalid then vids = playable(d.response.items)
+    m.srows.content = cards(vids, 2)
+    m.shint.text = ""
+    if vids.count() = 0 then m.shint.text = "Ничего не найдено"
 end sub
 
 ' rows of perRow cards; each card node carries its VK video object in field "v"
@@ -232,15 +287,19 @@ function cards(vids, perRow)
     root = CreateObject("roSGNode", "ContentNode")
     for i = 0 to vids.count() - 1
         if i mod perRow = 0 then row = root.createChild("ContentNode")
-        v = vids[i]
-        n = row.createChild("ContentNode")
-        n.HDPosterUrl = thumb(v)
-        n.title = v.title
-        n.description = meta(v)
-        n.ShortDescriptionLine2 = dur(v.duration)
-        n.addFields({v: v})
+        row.appendChild(card(vids[i]))
     end for
     return root
+end function
+
+function card(v)
+    n = CreateObject("roSGNode", "ContentNode")
+    n.HDPosterUrl = thumb(v)
+    n.title = v.title
+    n.description = meta(v)
+    n.ShortDescriptionLine2 = dur(v.duration)
+    n.addFields({v: v})
+    return n
 end function
 
 function playable(vids)
@@ -328,9 +387,10 @@ end sub
 sub runSearch()
     q = m.q.trim()
     if q = "" then return
-    m.shint.text = "Поиск…"
+    m.shint.text = ""
     m.srows.content = invalid
-    call("video.search", {q: q, count: 60, adult: 0, sort: 2}, "search")
+    setLoading(m.sskel, true)
+    m.task = call("video.search", {q: q, count: 60, adult: 0, sort: 2}, "search")
 end sub
 
 sub focusKb()

@@ -17,27 +17,35 @@
     <Label id="status" translation="[96,560]" width="1728" horizAlign="center" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
-    <RowList id="rows" translation="[96,150]" itemComponentName="VideoItem" numRows="2"
-      itemSize="[1728,456]" rowItemSize="[[560,315]]" rowItemSpacing="[[24,0]]" itemSpacing="[0,0]"
+    <!-- grid: 96 px side margins, 3 cards of 544x416 with 48 px gutters; 2 full rows fit above y=1024 -->
+    <RowList id="rows" translation="[96,144]" itemComponentName="VideoItem" numRows="2"
+      itemSize="[1728,416]" rowItemSize="[[544,416]]" rowItemSpacing="[[48,0]]" itemSpacing="[0,48]"
       showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
       drawFocusFeedback="false" />
+    <Group id="skel" translation="[96,144]" visible="false" />
     <Group id="search" visible="false">
-      <Rectangle translation="[96,150]" width="540" height="64" color="0x1E1F21FF" />
-      <Label id="query" translation="[116,150]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
+      <Rectangle translation="[96,144]" width="540" height="64" color="0x1E1F21FF" />
+      <Label id="query" translation="[116,144]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
         <Font role="font" uri="font:SystemFontFile" size="30" />
       </Label>
-      <MarkupGrid id="kb" translation="[96,234]" itemComponentName="KeyItem" numColumns="7" numRows="7"
+      <MarkupGrid id="kb" translation="[96,224]" itemComponentName="KeyItem" numColumns="7" numRows="7"
         itemSize="[72,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
-      <RowList id="srows" translation="[680,150]" itemComponentName="VideoItem" numRows="2"
-        itemSize="[1144,456]" rowItemSize="[[560,315]]" rowItemSpacing="[[24,0]]" itemSpacing="[0,0]"
+      <RowList id="srows" translation="[688,144]" itemComponentName="VideoItem" numRows="2"
+        itemSize="[1136,416]" rowItemSize="[[544,416]]" rowItemSpacing="[[48,0]]" itemSpacing="[0,48]"
         showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
         drawFocusFeedback="false" />
-      <Label id="shint" translation="[680,500]" width="1144" horizAlign="center" color="0x6F7378FF"
+      <Group id="sskel" translation="[688,144]" visible="false" />
+      <Label id="shint" translation="[688,560]" width="1136" horizAlign="center" color="0x6F7378FF"
         text="Наберите запрос — результаты появятся здесь">
         <Font role="font" uri="font:SystemFontFile" size="26" />
       </Label>
     </Group>
     <Timer id="searchTimer" duration="0.8" />
+    <!-- loading = skeleton cards breathing between 35% and 100% opacity -->
+    <Animation id="pulse" duration="1.6" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0, 0.5, 1]" keyValue="[0.35, 1, 0.35]" fieldToInterp="skel.opacity" />
+      <FloatFieldInterpolator key="[0, 0.5, 1]" keyValue="[0.35, 1, 0.35]" fieldToInterp="sskel.opacity" />
+    </Animation>
     <Video id="video" width="1920" height="1080" visible="false" enableUI="false" />
     <Group id="osd" visible="false">
       <Rectangle translation="[0,860]" width="1920" height="220" color="0x000000B0" />

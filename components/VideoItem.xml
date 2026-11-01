@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- 544x416 card: 16:9 poster 544x306, title 2 lines max, meta on a fixed line. Grid gutters are 48 px both ways. -->
 <component name="VideoItem" extends="Group">
   <interface>
     <field id="itemContent" type="node" onChange="onContent" />
     <field id="focusPercent" type="float" onChange="onFocus" />
     <field id="rowListHasFocus" type="boolean" onChange="onFocus" />
+    <field id="rowHasFocus" type="boolean" onChange="onFocus" />
   </interface>
   <children>
-    <Group id="card" scaleRotateCenter="[280,157]">
-      <Rectangle id="ring" translation="[-3,-3]" width="566" height="321" color="0xFFFFFFFF" opacity="0" />
-      <Rectangle width="560" height="315" color="0x19191AFF" />
-      <Poster id="poster" width="560" height="315" loadDisplayMode="scaleToZoom" />
-      <Rectangle id="badgeBg" translation="[468,275]" width="80" height="28" color="0x000000A0" />
-      <Label id="dur" translation="[468,275]" width="80" height="28" horizAlign="center" vertAlign="center" color="0xFFFFFFFF">
-        <Font role="font" uri="font:SystemFontFile" size="18" />
-      </Label>
-    </Group>
-    <Label id="title" translation="[0,334]" width="560" wrap="true" maxLines="2" lineSpacing="2" color="0xB8BBC0FF">
+    <Rectangle id="ring" translation="[-4,-4]" width="552" height="314" color="0xFFFFFFFF" opacity="0" />
+    <Rectangle width="544" height="306" color="0x19191AFF" />
+    <Poster id="poster" width="544" height="306" loadDisplayMode="scaleToZoom" />
+    <Rectangle id="badgeBg" translation="[456,266]" width="76" height="28" color="0x000000B0" />
+    <Label id="dur" translation="[456,266]" width="76" height="28" horizAlign="center" vertAlign="center" color="0xFFFFFFFF">
+      <Font role="font" uri="font:SystemFontFile" size="18" />
+    </Label>
+    <Label id="title" translation="[0,326]" width="544" wrap="true" maxLines="2" lineSpacing="0" color="0xB8BBC0FF">
       <Font role="font" uri="font:SystemFontFile" size="24" />
     </Label>
-    <Label id="meta" translation="[0,398]" width="560" color="0x6F7378FF">
+    <Label id="meta" translation="[0,384]" width="544" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="19" />
     </Label>
   </children>
@@ -35,10 +35,8 @@
     end sub
     sub onFocus()
       f = m.top.focusPercent
-      if not m.top.rowListHasFocus then f = 0
+      if not (m.top.rowListHasFocus and m.top.rowHasFocus) then f = 0
       m.top.findNode("ring").opacity = f
-      s = 1 + 0.04 * f
-      m.top.findNode("card").scale = [s, s]
       if f > 0.5 then m.top.findNode("title").color = "0xFFFFFFFF" else m.top.findNode("title").color = "0xB8BBC0FF"
     end sub
   ]]></script>

@@ -21,7 +21,7 @@
           sep = "&"
         end for
       end if
-      ' VK API sometimes stalls for 30+ s: give each attempt 10 s, up to 3 attempts
+      ' VK API sometimes stalls for 30+ s while a normal page takes ~2 s: give each attempt 7 s, up to 3 attempts
       data = invalid
       for attempt = 1 to 3
         ut = CreateObject("roUrlTransfer")
@@ -32,7 +32,7 @@
         port = CreateObject("roMessagePort")
         ut.SetMessagePort(port)
         if ut.AsyncGetToString() then
-          msg = wait(10000, port)
+          msg = wait(7000, port)
           if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then data = ParseJson(msg.GetString())
           if msg = invalid then ut.AsyncCancel()
         end if
