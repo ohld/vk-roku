@@ -479,11 +479,17 @@ sub onPick(e)
     if m.list.isSameNode(m.srows) then recordQuery()
     sel = m.list.rowItemSelected
     m.cur = m.list.content.getChild(sel[0]).getChild(sel[1]).v
-    k = "mp4_720"
-    if m.cur.files.mp4_1080 <> invalid then k = "mp4_1080"
     viewStart()
-    play(k, 0)
+    play(firstQuality(), 0)
 end sub
+
+'  HLS starts in ~1 segment over one kept-alive connection; progressive mp4 makes Roku open ~6 sequential
+'  TLS connections across the ocean (11-14 s). The relay strips HLS variants below 720p and above 1080p.
+function firstQuality() as string
+    if m.cur.files.hls <> invalid then return "hls"   ' relay answers with the 1080p media playlist (Roku stalls on VK masters)
+    if m.cur.files.mp4_1080 <> invalid then return "mp4_1080"
+    return "mp4_720"
+end function
 
 sub play(k, startAt)
     m.quality = k
@@ -492,7 +498,9 @@ sub play(k, startAt)
     m.prev = ""
     c = CreateObject("roSGNode", "ContentNode")
     c.url = m.relay + m.cur.files[k]
+    if k = "hls" then c.url = m.relay + "h/" + m.cur.files.hls.mid(8)   ' /KEY/h/host/path: relative segment URIs resolve under it
     c.streamFormat = "mp4"
+    if k = "hls" then c.streamFormat = "hls"
     c.title = m.cur.title
     c.bookmarkPosition = startAt
     segEnd()
@@ -619,6 +627,11 @@ sub onVideoState()
             return
         end if
     else if st = "error" then
+        if m.quality = "hls" then
+            m.cur.files.delete("hls")
+            play(firstQuality(), m.video.position)   ' HLS failed: progressive mp4, still >= 720p
+            return
+        end if
         if m.quality = "mp4_1080" and m.cur.files.mp4_720 <> invalid then
             play("mp4_720", m.video.position)   ' still >= 720p
             return
@@ -626,7 +639,7 @@ sub onVideoState()
         m.failed = true   ' keep the player open with the reason; Back returns to the list
         m.top.findNode("osdTitle").text = "Не удалось воспроизвести видео"
         showOsd()
-    else if st = "finished" then
+    else if st = "finished" and m.prev <> "" then   ' a "finished" right after a fallback restart is the old stream ending
         closeVideo()
     end if
     m.prev = st
