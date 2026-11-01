@@ -15,7 +15,6 @@
       ut.SetCertificatesFile("common:/certs/ca-bundle.crt")
       ut.InitClientCertificates()
       ut.RetainBodyOnError(true)
-      ut.AddHeader("User-Agent", "KateMobileAndroid/109.1 lite-550 (Android 13; SDK 33; arm64-v8a; Google Pixel; ru)")
       url = m.top.url
       sep = "?"
       p = m.top.params

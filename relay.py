@@ -4,7 +4,7 @@
 and this server fetches it from VK (fast path from a Hetzner box) and streams it back with Range support.
 Only VK hosts are allowed and a secret KEY is required, so this is not an open proxy.
 Env: RELAY_KEY (required), PORT (default 8787)."""
-import http.server, os, shutil, socketserver, urllib.error, urllib.parse, urllib.request
+import http.server, os, shutil, urllib.error, urllib.parse, urllib.request
 
 KEY = os.environ["RELAY_KEY"]
 ALLOWED = ("vk.com", "vk.ru", "okcdn.ru", "mycdn.me", "userapi.com", "vkuser.net", "vkuservideo.net", "vkvideo.ru")
@@ -28,8 +28,18 @@ def allowed(url):
     return p.scheme == "https" and any(host == d or host.endswith("." + d) for d in ALLOWED)
 
 
+class VKOnlyRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow redirects only to allowed VK hosts (no SSRF via a VK open redirect)."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return super().redirect_request(req, fp, code, msg, headers, newurl) if allowed(newurl) else None
+
+
+OPENER = urllib.request.build_opener(VKOnlyRedirects)
+
+
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    timeout = 60  # idle keep-alive connections die instead of pinning threads
 
     def do_GET(self):
         if self.path == "/health":
@@ -41,7 +51,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.headers.get("Range"):
             hdr["Range"] = self.headers["Range"]
         try:
-            up = urllib.request.urlopen(urllib.request.Request(url, headers=hdr), timeout=30)
+            up = OPENER.open(urllib.request.Request(url, headers=hdr), timeout=30)
         except urllib.error.HTTPError as e:
             up = e
         except Exception:
@@ -55,8 +65,8 @@ class H(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         try:
             shutil.copyfileobj(up, self.wfile, 256 * 1024)
-        except (BrokenPipeError, ConnectionResetError):
-            pass  # TV seeked or closed the stream
+        except OSError:
+            self.close_connection = True  # TV seeked/closed, or VK reset mid-body: never reuse a desynced socket
         finally:
             up.close()
 
@@ -70,13 +80,8 @@ class H(http.server.BaseHTTPRequestHandler):
         pass  # never log URLs: they carry the VK access token
 
 
-class S(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    daemon_threads = True
-    allow_reuse_address = True
-
-
 if __name__ == "__main__":
     assert allowed("https://api.vk.com/method/x") and allowed("https://vkvd1.okcdn.ru/?a=1")
     assert target(PREFIX + "https:/api.vk.com/m?a=1") == "https://api.vk.com/m?a=1" == target(PREFIX + "https://api.vk.com/m?a=1")
     assert not allowed("https://evil.com/") and not allowed("https://okcdn.ru.evil.com/") and not allowed("http://api.vk.com/")
-    S(("0.0.0.0", int(os.environ.get("PORT", "8787"))), H).serve_forever()
+    http.server.ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8787"))), H).serve_forever()

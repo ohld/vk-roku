@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="MainScene" extends="Scene">
   <interface>
-    <field id="externalToken" type="string" onChange="onExternalToken" />
-    <field id="externalSearch" type="string" onChange="onExternalSearch" />
+    <field id="tokens" type="assocarray" onChange="onTokens" />
   </interface>
   <children>
     <Rectangle color="0x0A0A0AFF" width="1920" height="1080" />
-    <Group id="tabs" translation="[96,52]" />
+    <LayoutGroup id="tabs" translation="[96,52]" layoutDirection="horiz" itemSpacings="[56]">
+      <Label text="Для вас"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
+      <Label text="Тренды"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
+      <Label text="Поиск"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
+    </LayoutGroup>
     <Rectangle id="underline" translation="[96,100]" width="0" height="3" color="0x0077FFFF" />
     <Label text="VK Видео" translation="[1520,52]" width="304" horizAlign="right" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
