@@ -290,6 +290,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if key = "back" then
             closeVideo()
             return true
+        else if key = "OK" then
+            if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
+            return true
+        else if key = "left" or key = "right" then
+            d = 10
+            if key = "left" then d = -10
+            m.video.seek = m.video.position + d
+            return true
         end if
         return false
     end if
