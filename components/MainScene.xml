@@ -5,46 +5,46 @@
   </interface>
   <children>
     <Rectangle color="0x0A0A0AFF" width="1920" height="1080" />
-    <LayoutGroup id="tabs" translation="[96,52]" layoutDirection="horiz" itemSpacings="[56]">
+    <LayoutGroup id="tabs" translation="[32,52]" layoutDirection="horiz" itemSpacings="[56]">
       <Label text="Для вас"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
       <Label text="Тренды"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
       <Label text="Поиск"><Font role="font" uri="font:SystemFontFile" size="30" /></Label>
     </LayoutGroup>
-    <Rectangle id="underline" translation="[96,100]" width="0" height="3" color="0x0077FFFF" />
-    <Label text="VK Видео" translation="[1520,52]" width="304" horizAlign="right" color="0x6F7378FF">
+    <Rectangle id="underline" translation="[32,100]" width="0" height="3" color="0x0077FFFF" />
+    <Label text="VK Видео" translation="[1584,52]" width="304" horizAlign="right" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
-    <Label id="status" translation="[96,520]" width="1728" horizAlign="center" wrap="true" lineSpacing="12" color="0x6F7378FF">
+    <Label id="status" translation="[32,520]" width="1856" horizAlign="center" wrap="true" lineSpacing="12" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
-    <!-- grid: 96 px side margins, 3 cards of 544x416 with 48 px gutters (items carry 6 px halo padding); 2 rows fit above y=1024 -->
-    <RowList id="rows" translation="[90,138]" itemComponentName="VideoItem" numRows="2"
-      itemSize="[1740,428]" rowItemSize="[[556,428]]" rowItemSpacing="[[36,0]]" itemSpacing="[0,36]"
+    <!-- grid: 32 px side margins, 3 cards of 608 px (poster 608x342) with 16 px gutters; items carry 6 px halo padding -->
+    <RowList id="rows" translation="[26,138]" itemComponentName="VideoItem" numRows="2"
+      itemSize="[1868,458]" rowItemSize="[[620,458]]" rowItemSpacing="[[4,0]]" itemSpacing="[0,4]"
       showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
       drawFocusFeedback="false" />
-    <Group id="skel" translation="[96,144]" visible="false" />
+    <Group id="skel" translation="[32,144]" visible="false" />
     <Group id="search" visible="false">
-      <Rectangle translation="[96,144]" width="540" height="64" color="0x1E1F21FF" />
-      <Label id="query" translation="[116,144]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
+      <Rectangle translation="[32,144]" width="540" height="64" color="0x1E1F21FF" />
+      <Label id="query" translation="[52,144]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
         <Font role="font" uri="font:SystemFontFile" size="30" />
       </Label>
-      <Label id="qph" translation="[116,144]" width="500" height="64" vertAlign="center" color="0x6F7378FF" text="Поиск видео">
+      <Label id="qph" translation="[52,144]" width="500" height="64" vertAlign="center" color="0x6F7378FF" text="Поиск видео">
         <Font role="font" uri="font:SystemFontFile" size="30" />
       </Label>
-      <MarkupGrid id="kb" translation="[96,224]" itemComponentName="KeyItem" numColumns="6" numRows="7"
+      <MarkupGrid id="kb" translation="[32,224]" itemComponentName="KeyItem" numColumns="6" numRows="7"
         itemSize="[85,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
       <!-- search history from VK (catalog.getVideoSearch), under the keyboard -->
-      <Label id="recentHdr" translation="[96,668]" text="Недавние" visible="false" color="0x6F7378FF">
+      <Label id="recentHdr" translation="[32,668]" text="Недавние" visible="false" color="0x6F7378FF">
         <Font role="font" uri="font:SystemFontFile" size="22" />
       </Label>
-      <MarkupGrid id="recent" translation="[96,708]" itemComponentName="RecentItem" numColumns="1" numRows="6"
+      <MarkupGrid id="recent" translation="[32,708]" itemComponentName="RecentItem" numColumns="1" numRows="6"
         itemSize="[540,48]" itemSpacing="[0,4]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
-      <RowList id="srows" translation="[682,138]" itemComponentName="VideoItem" numRows="2"
-        itemSize="[1148,428]" rowItemSize="[[556,428]]" rowItemSpacing="[[36,0]]" itemSpacing="[0,36]"
+      <RowList id="srows" translation="[650,138]" itemComponentName="VideoItem" numRows="2"
+        itemSize="[1244,458]" rowItemSize="[[620,458]]" rowItemSpacing="[[4,0]]" itemSpacing="[0,4]"
         showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"
         drawFocusFeedback="false" />
-      <Group id="sskel" translation="[688,144]" visible="false" />
-      <Label id="shint" translation="[688,560]" width="1136" horizAlign="center" color="0x6F7378FF"
+      <Group id="sskel" translation="[656,144]" visible="false" />
+      <Label id="shint" translation="[656,560]" width="1232" horizAlign="center" color="0x6F7378FF"
         text="Наберите запрос — результаты появятся здесь">
         <Font role="font" uri="font:SystemFontFile" size="26" />
       </Label>

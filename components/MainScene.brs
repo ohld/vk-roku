@@ -57,9 +57,9 @@ end sub
 ' 2 rows of placeholder cards with the VideoItem geometry
 sub drawSkel(g, cols)
     for i = 0 to cols * 2 - 1
-        x = (i mod cols) * 592
-        y = Int(i / cols) * 464
-        for each r in [[0, 0, 544, 306], [0, 332, 420, 20], [0, 360, 280, 20], [0, 390, 160, 16]]
+        x = (i mod cols) * 624
+        y = Int(i / cols) * 462
+        for each r in [[0, 0, 608, 342], [0, 368, 460, 20], [0, 396, 300, 20], [0, 426, 200, 16]]
             b = g.createChild("Rectangle")
             b.translation = [x + r[0], y + r[1]]
             b.width = r[2]
@@ -100,7 +100,7 @@ sub paintTabs()
         m.tabLabels[i].color = c
     end for
     l = m.tabLabels[m.tab]
-    m.underline.translation = [96 + l.translation[0], 100]
+    m.underline.translation = [32 + l.translation[0], 100]
     m.underline.width = l.boundingRect().width
     if m.inTabs then m.underline.color = "0x0077FFFF" else m.underline.color = "0x0077FF80"
 end sub
@@ -168,6 +168,7 @@ sub viewStart()
     m.okKey = invalid
     m.stat = {vi: m.cur.ov_id, tc: m.cur.track_code, si: CreateObject("roDeviceInfo").GetRandomUUID().replace("-", "").left(13)}
     vid = m.cur.owner_id.toStr() + "_" + m.cur.id.toStr()
+    if m.watched <> invalid then m.watched[vid] = true   ' gone from For you on the next refresh
     fire("video.addViewingHistoryRecord", {video_id: vid})
     m.hashTask = call("video.getHashes", {video: vid}, "hash")
     m.stokTask = call("video.getStatsToken", {env: "production"}, "stok")
@@ -229,11 +230,44 @@ end sub
 ' Both catalog tabs load in parallel from startup. Each section shows its first page (~4-7 videos) at once,
 ' then keeps paging in the background up to 36 videos, and loads further pages when the user nears the end.
 sub resetSections()
-    m.sec = []
+    m.sec = [invalid, invalid]
+    loadWatched()
     for i = 0 to 1
-        m.sec.push({root: CreateObject("roSGNode", "ContentNode"), seen: {}, n: 0, nf: "", done: false, task: invalid, err: ""})
-        loadMore(i)
+        newSection(i)
     end for
+end sub
+
+sub newSection(i)
+    m.sec[i] = {root: CreateObject("roSGNode", "ContentNode"), seen: {}, n: 0, nf: "", done: false, task: invalid, err: ""}
+    loadMore(i)
+end sub
+
+sub refreshTab(i)
+    if i = 0 then loadWatched()
+    newSection(i)
+    m.rows.content = invalid
+    showSection(i)
+end sub
+
+' VK's For you keeps recommending videos already watched; hide everything in the watch history ("My" section)
+sub loadWatched()
+    m.watched = invalid
+    m.pend0 = invalid
+    if m.token <> "" then m.watchedTask = call("catalog.getSection", {section_id: "PUldVA8AR0RzSVNUWE1JSmRSS0wESQ"}, "watched")
+end sub
+
+sub onWatched(d)
+    m.watched = {}
+    if d.response <> invalid and d.response.videos <> invalid then
+        for each v in d.response.videos
+            m.watched[v.owner_id.toStr() + "_" + v.id.toStr()] = true
+        end for
+    end if
+    if m.pend0 <> invalid then
+        p = m.pend0
+        m.pend0 = invalid
+        onSection(0, p)
+    end if
 end sub
 
 sub loadMore(i)
@@ -250,6 +284,10 @@ sub onRowFocus()
 end sub
 
 sub onSection(i, d)
+    if i = 0 and m.watched = invalid then   ' hold For you until the watch history is known
+        m.pend0 = d
+        return
+    end if
     s = m.sec[i]
     s.task = invalid
     if d.error <> invalid then
@@ -260,7 +298,7 @@ sub onSection(i, d)
         vids = playable(resp.videos)
         for each v in vids
             k = v.owner_id.toStr() + "_" + v.id.toStr()
-            if not s.seen.doesExist(k) then
+            if not s.seen.doesExist(k) and not (i = 0 and m.watched.doesExist(k)) then
                 s.seen[k] = true
                 addCard(s, v)
             end if
@@ -312,6 +350,9 @@ sub onResult(e)
     r = e.getData()
     if r.tag = "hash" or r.tag = "stok" or r.tag = "oklogin" or r.tag = "oklog" then
         onStats(r)
+        return
+    else if r.tag = "watched" then
+        if e.getRoSGNode().isSameNode(m.watchedTask) then onWatched(r.data)
         return
     else if r.tag = "sugg" then
         if e.getRoSGNode().isSameNode(m.sugTask) and m.q.trim() <> "" then showList(r.data, false)
@@ -389,24 +430,51 @@ function dur(sec) as string
 end function
 
 function meta(v) as string
+    parts = []
     n = v.views
-    if n = invalid then return ""
-    if n >= 1000000 then
-        t = (Int(n / 100000) / 10).toStr() + " млн"
-    else if n >= 1000 then
-        t = Int(n / 1000).toStr() + " тыс."
-    else
-        t = n.toStr()
+    if n <> invalid then
+        if n >= 1000000 then
+            parts.push((Int(n / 100000) / 10).toStr().replace(".", ",") + " млн просмотров")
+        else if n >= 1000 then
+            parts.push(Int(n / 1000).toStr() + " тыс. просмотров")
+        else
+            parts.push(n.toStr() + " " + plural(n, "просмотр", "просмотра", "просмотров"))
+        end if
     end if
-    return t + " просмотров"
+    if v.date <> invalid and v.date > 0 then parts.push(ago(v.date))
+    return parts.join("  ·  ")
 end function
 
-' smallest unpadded image that covers the 544 px card (VK also sends letterboxed "with_padding" variants)
+' "3 часа назад", "2 дня назад" ... from a unix upload time
+function ago(ts) as string
+    d = CreateObject("roDateTime").AsSeconds() - ts
+    if d < 3600 then
+        n = Int(d / 60)
+        if n < 1 then return "только что"
+        return n.toStr() + " " + plural(n, "минуту", "минуты", "минут") + " назад"
+    end if
+    for each u in [[31536000, "год", "года", "лет"], [2592000, "месяц", "месяца", "месяцев"], [604800, "неделю", "недели", "недель"], [86400, "день", "дня", "дней"], [3600, "час", "часа", "часов"]]
+        n = Int(d / u[0])
+        if n >= 1 then return n.toStr() + " " + plural(n, u[1], u[2], u[3]) + " назад"
+    end for
+    return ""
+end function
+
+function plural(n, one, few, many) as string
+    t = n mod 100
+    if t >= 11 and t <= 14 then return many
+    t = n mod 10
+    if t = 1 then return one
+    if t >= 2 and t <= 4 then return few
+    return many
+end function
+
+' smallest unpadded image that covers the 608 px card (VK also sends letterboxed "with_padding" variants)
 function thumb(v) as string
     if v.image = invalid then return ""
     best = invalid
     for each im in v.image
-        if im.with_padding = invalid and (best = invalid or (best.width < 544 and im.width > best.width) or (im.width >= 544 and im.width < best.width)) then best = im
+        if im.with_padding = invalid and (best = invalid or (best.width < 608 and im.width > best.width) or (im.width >= 608 and im.width < best.width)) then best = im
     end for
     if best = invalid and v.image.count() > 0 then best = v.image[v.image.count() - 1]
     if best = invalid then return ""
@@ -422,7 +490,10 @@ function clean(t) as string
     for i = 1 to Len(t)
         ch = Mid(t, i, 1)
         c = Asc(ch)
-        if c >= 32 and c < &h2190 and not (c >= &h200B and c <= &h200F) and not (c >= &h2028 and c <= &h206F and c <> &h2030 and c <> &h2039 and c <> &h203A) then out = out + ch else out = out + " "   ' a dropped emoji often separates two words
+        ' whitelist of what the Roku system font draws (anything else renders as a box): Latin + Latin-1/Ext-A, Greek, Cyrillic,
+        ' dashes/quotes/bullet/ellipsis, currency, № and ™. A dropped emoji often separates two words, so it becomes a space.
+        keep = (c >= 32 and c <= 126) or (c >= 160 and c <= 383) or (c >= 880 and c <= 1279) or (c >= &h2010 and c <= &h2027) or (c >= &h2030 and c <= &h203A) or (c >= &h20A0 and c <= &h20BF) or c = &h2116 or c = &h2122
+        if keep then out = out + ch else out = out + " "
     end for
     return m.spaces.ReplaceAll(out, " ").Trim()
 end function
@@ -430,10 +501,17 @@ end function
 ' ---------- search ----------
 ' Roku keyboards have no Cyrillic, so the search tab has its own grid keyboard; results refresh 0.8 s after typing
 sub fillKb()
-    keys = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("")
-    if m.lang = "en" then keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split("")
-    keys.append(["Пробел", "Стереть", "ABC"])
-    if m.lang = "en" then keys[keys.count() - 1] = "АБВ"
+    ' one layout key cycles RU -> EN -> digits -> RU (RU then fills exactly 6 rows)
+    if m.lang = "en" then
+        keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")
+        keys.append(["Пробел", "Стереть", "123"])
+    else if m.lang = "num" then
+        keys = "1234567890".split("")
+        keys.append(["Пробел", "Стереть", "АБВ"])
+    else
+        keys = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("")
+        keys.append(["Пробел", "Стереть", "ABC"])
+    end if
     c = CreateObject("roSGNode", "ContentNode")
     for each k in keys
         c.createChild("ContentNode").title = k
@@ -442,15 +520,16 @@ sub fillKb()
     ' history list starts under the last key row (RU 6 rows, EN 7) and fills the space down to y=1020
     rows = Int((keys.count() + 5) / 6)
     y = 224 + rows * 70 + 24
-    m.top.findNode("recentHdr").translation = [96, y]
-    m.recent.translation = [96, y + 40]
+    m.top.findNode("recentHdr").translation = [32, y]
+    m.recent.translation = [32, y + 40]
     m.recent.numRows = Int((1020 - y - 40 + 4) / 52)
 end sub
 
 sub onKey()
     k = m.kb.content.getChild(m.kb.itemSelected).title
-    if k = "ABC" or k = "АБВ" then
-        if m.lang = "ru" then m.lang = "en" else m.lang = "ru"
+    langs = {"ABC": "en", "АБВ": "ru", "123": "num"}
+    if langs.doesExist(k) then
+        m.lang = langs[k]
         fillKb()
         m.kb.jumpToItem = m.kb.content.getChildCount() - 1
         return
@@ -462,6 +541,10 @@ sub onKey()
         if k = "Ё" then k = "ё" else k = LCase(k)   ' LCase maps Ё (U+0401) to С (U+0421)
         m.q = m.q + k
     end if
+    typed()
+end sub
+
+sub typed()
     setQuery(m.q)
     m.searchTimer.control = "stop"
     m.searchTimer.control = "start"
@@ -517,10 +600,16 @@ end sub
 
 sub runSearch()
     q = m.q.trim()
-    if q = "" then return
+    if q = "" then   ' erased: back to the empty state
+        m.task = invalid
+        m.shown = invalid
+        m.srows.content = invalid
+        setLoading(m.sskel, false)
+        m.shint.text = "Наберите запрос — результаты появятся здесь"
+        return
+    end if
     m.shint.text = ""
-    m.srows.content = invalid
-    setLoading(m.sskel, true)
+    if m.srows.content = invalid then setLoading(m.sskel, true)   ' later queries keep old results until new ones land
     m.task = call("video.search", {q: q, count: 60, adult: 0, sort: 2}, "search")
     m.shown = q
 end sub
@@ -730,6 +819,11 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if m.video.visible then return playerKey(key, press)
     if not press then return false
+    if m.tab = 2 and (key.left(4) = "Lit_" or key = "backspace") then   ' typing from the Roku mobile app keyboard (incl. phone dictation)
+        if key = "backspace" then m.q = m.q.left(m.q.len() - 1) else m.q = m.q + LCase(key.mid(4))
+        typed()
+        return true
+    end if
     if m.inTabs then
         m.autoGrid = false
         if key = "back" then return false   ' let Back exit the app from the tab bar
@@ -739,7 +833,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
             openTab(m.tab + 1)
         else if (key = "OK" or key = "down") and m.tab = 2 then
             focusKb()
-        else if (key = "OK" or key = "down") and m.rows.content = invalid then
+        else if key = "OK" then
+            refreshTab(m.tab)   ' OK on a tab reloads it from VK
+        else if key = "down" and m.rows.content = invalid then
             openTab(m.tab)   ' error / empty: retry
         else if key = "down" and m.rows.content <> invalid then
             m.inTabs = false
