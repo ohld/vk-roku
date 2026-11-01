@@ -159,12 +159,59 @@ sub fire(method, params)
     m.bg.push(t)   ' keep references while they run
 end sub
 
-' what the official app sends: history record on start, watched ranges on exit
+' What the vkvideo.ru player sends: a history record and a view (incViewCounter, needs a hash from getHashes).
+' Watched time (VK "viewed_duration") is counted only by the player stats service on OK.ru: log in there with a
+' VK stats token, then report watched ranges ("wr" items) every 30 s and on pause/seek/exit. Verified 2026-11-01.
 sub viewStart()
     m.ranges = []
     m.segStart = -1
-    m.started = CreateObject("roDateTime").AsSeconds()
-    fire("video.addViewingHistoryRecord", {video_id: m.cur.owner_id.toStr() + "_" + m.cur.id.toStr()})
+    m.okKey = invalid
+    m.stat = {vi: m.cur.ov_id, tc: m.cur.track_code, si: CreateObject("roDeviceInfo").GetRandomUUID().replace("-", "").left(13)}
+    vid = m.cur.owner_id.toStr() + "_" + m.cur.id.toStr()
+    fire("video.addViewingHistoryRecord", {video_id: vid})
+    m.hashTask = call("video.getHashes", {video: vid}, "hash")
+    m.stokTask = call("video.getStatsToken", {env: "production"}, "stok")
+end sub
+
+function okCall(params, tag)
+    params.format = "JSON"
+    params.application_key = "CIOPGQJGDIHBABABA"
+    t = CreateObject("roSGNode", "ApiTask")
+    t.url = m.relay + "https://api.okcdn.ru/fb.do"
+    t.params = params
+    t.tag = tag
+    t.observeField("result", "onResult")
+    t.control = "run"
+    return t
+end function
+
+sub onStats(r)
+    d = r.data
+    if r.tag = "hash" and d.response <> invalid and d.response.video <> invalid then
+        fire("video.incViewCounter", {owner_id: m.cur.owner_id, video_id: m.cur.id, hash: d.response.video})
+    else if r.tag = "stok" and d.response <> invalid and d.response.token <> invalid then
+        sd = {version: 3, device_id: "roku" + m.stat.si, client_version: "1.0.125", client_type: "SDK_JS", auth_token: d.response.token}
+        m.okTask = okCall({method: "auth.anonymLogin", session_data: FormatJson(sd)}, "oklogin")
+    else if r.tag = "oklogin" and d.session_key <> invalid then
+        m.okKey = d.session_key
+        flushRanges()
+    end if
+end sub
+
+sub flushRanges()
+    if m.okKey = invalid or m.ranges.count() = 0 or m.stat.vi = invalid then return
+    ms& = CreateObject("roDateTime").AsSeconds()
+    ms& = ms& * 1000
+    items = []
+    for each rg in m.ranges
+        c = {si: m.stat.si, vi: m.stat.vi, pl: "direct", qt: "fullhd", st: "auto", pm: rg, va: "52461373"}
+        if m.stat.tc <> invalid then c.tc = m.stat.tc
+        items.push({operation: "wr", type: 1, network: "excellent", timestamp: ms&, custom: c})
+    end for
+    data = {application: "@vkontakte/videoplayer-statistics:1.0.125", platform: "WEB", items: items}
+    t = okCall({method: "log.externalLog", session_key: m.okKey, collector: "ok.mobile.apps.video", data: FormatJson(data)}, "oklog")
+    m.bg.push(t)
+    m.ranges = []
 end sub
 
 sub segEnd()
@@ -172,15 +219,11 @@ sub segEnd()
     e = Int(m.video.position)
     if e > m.segStart then m.ranges.push(m.segStart.toStr() + "-" + e.toStr())
     m.segStart = -1
+    flushRanges()   ' queued until the OK.ru login lands
 end sub
 
 sub viewEnd()
     segEnd()
-    if m.ranges = invalid or m.ranges.count() = 0 then return
-    p = {owner_id: m.cur.owner_id, video_id: m.cur.id, ranges: m.ranges.join(","), start_time: m.started, state_start: "fullscreen", state_end: "fullscreen", end_stream_reason: "session_end", autoplay: 0}
-    if m.cur.track_code <> invalid then p.track_code = m.cur.track_code
-    fire("video.viewSegments", p)
-    m.ranges = []
 end sub
 
 ' Both catalog tabs load in parallel from startup. Each section shows its first page (~4-7 videos) at once,
@@ -267,8 +310,14 @@ end sub
 
 sub onResult(e)
     r = e.getData()
-    if r.tag = "hist" then
-        showHistory(r.data)
+    if r.tag = "hash" or r.tag = "stok" or r.tag = "oklogin" or r.tag = "oklog" then
+        onStats(r)
+        return
+    else if r.tag = "sugg" then
+        if e.getRoSGNode().isSameNode(m.sugTask) and m.q.trim() <> "" then showList(r.data, false)
+        return
+    else if r.tag = "hist" then
+        if m.q.trim() = "" then showList(r.data, true)
         return
     else if r.tag = "histadd" then
         loadHistory()   ' VK has moved the query to the top of its list
@@ -416,6 +465,19 @@ sub onKey()
     setQuery(m.q)
     m.searchTimer.control = "stop"
     m.searchTimer.control = "start"
+    loadSuggestions()
+end sub
+
+' Under the keyboard: VK search history while the query is empty, VK autocomplete once something is typed.
+' show_suggests + input_method=keyboard is what vkvideo.ru sends per keystroke; it does not touch history.
+sub loadSuggestions()
+    q = m.q.trim()
+    if q = "" then
+        m.sugTask = invalid
+        loadHistory()
+    else if m.token <> "" then
+        m.sugTask = call("catalog.getVideoSearch", {q: q, show_suggests: 1, screen_ref: "search_video_service", input_method: "keyboard"}, "sugg")
+    end if
 end sub
 
 sub setQuery(q)
@@ -429,13 +491,17 @@ sub loadHistory()
     if m.token <> "" then m.hist = call("catalog.getVideoSearch", {}, "hist")
 end sub
 
-sub showHistory(d)
+sub showList(d, history)
     c = CreateObject("roSGNode", "ContentNode")
     if d.response <> invalid and d.response.suggestions <> invalid then
         for each sg in d.response.suggestions
-            if c.getChildCount() < 8 and sg.type = "recent" and sg.title <> invalid then c.createChild("ContentNode").title = clean(sg.title)
+            ty = sg.type
+            if ty = invalid then ty = ""
+            keep = sg.title <> invalid and (ty = "recent") = history
+            if c.getChildCount() < 8 and keep then c.createChild("ContentNode").title = clean(sg.title)
         end for
     end if
+    if history then m.top.findNode("recentHdr").text = "Недавние" else m.top.findNode("recentHdr").text = "Подсказки"
     has = c.getChildCount() > 0
     if m.recent.hasFocus() and not has then m.kb.setFocus(true)
     m.recent.content = c
@@ -556,6 +622,10 @@ end function
 
 sub onPos()
     if m.osd.visible and m.target < 0 then drawOsd()
+    if m.segStart >= 0 and m.video.position - m.segStart >= 30 then   ' report watched time every 30 s, like the web player
+        segEnd()
+        m.segStart = Int(m.video.position)
+    end if
 end sub
 
 sub nudge(d)
