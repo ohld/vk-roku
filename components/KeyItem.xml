@@ -17,7 +17,7 @@
       t = m.top.itemContent.title
       l = m.top.findNode("lbl")
       l.text = t
-      if t.len() > 3 then l.font.size = 15
+      if t.len() > 3 then l.font.size = 17
     end sub
     sub onFocus()
       on = m.top.gridHasFocus and m.top.focusPercent > 0.5

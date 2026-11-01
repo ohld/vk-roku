@@ -14,7 +14,7 @@
     <Label text="VK Видео" translation="[1520,52]" width="304" horizAlign="right" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
-    <Label id="status" translation="[96,560]" width="1728" horizAlign="center" color="0x6F7378FF">
+    <Label id="status" translation="[96,520]" width="1728" horizAlign="center" wrap="true" lineSpacing="12" color="0x6F7378FF">
       <Font role="font" uri="font:SystemFontFile" size="26" />
     </Label>
     <!-- grid: 96 px side margins, 3 cards of 544x416 with 48 px gutters; 2 full rows fit above y=1024 -->
@@ -28,8 +28,17 @@
       <Label id="query" translation="[116,144]" width="500" height="64" vertAlign="center" color="0xFFFFFFFF">
         <Font role="font" uri="font:SystemFontFile" size="30" />
       </Label>
+      <Label id="qph" translation="[116,144]" width="500" height="64" vertAlign="center" color="0x6F7378FF" text="Поиск видео">
+        <Font role="font" uri="font:SystemFontFile" size="30" />
+      </Label>
       <MarkupGrid id="kb" translation="[96,224]" itemComponentName="KeyItem" numColumns="7" numRows="7"
         itemSize="[72,64]" itemSpacing="[6,6]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
+      <!-- search history from VK (catalog.getVideoSearch), under the keyboard -->
+      <Label id="recentHdr" translation="[96,668]" text="Недавние" visible="false" color="0x6F7378FF">
+        <Font role="font" uri="font:SystemFontFile" size="22" />
+      </Label>
+      <MarkupGrid id="recent" translation="[96,708]" itemComponentName="RecentItem" numColumns="1" numRows="6"
+        itemSize="[540,48]" itemSpacing="[0,4]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
       <RowList id="srows" translation="[688,144]" itemComponentName="VideoItem" numRows="2"
         itemSize="[1136,416]" rowItemSize="[[544,416]]" rowItemSpacing="[[48,0]]" itemSpacing="[0,48]"
         showRowLabel="[false]" rowFocusAnimationStyle="floatingFocus" vertFocusAnimationStyle="floatingFocus"

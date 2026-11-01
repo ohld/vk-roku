@@ -1,7 +1,9 @@
 title=VK Video
 major_version=1
 minor_version=0
-build_version=24
+build_version=29
 ui_resolutions=fhd
-splash_color=#0077FF
+splash_color=#0A0A0A
 splash_min_time=500
+mm_icon_focus_fhd=pkg:/images/icon_fhd.png
+mm_icon_focus_hd=pkg:/images/icon_hd.png

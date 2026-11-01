@@ -26,6 +26,8 @@ sub init()
     m.queryLbl = m.top.findNode("query")
     m.searchTimer = m.top.findNode("searchTimer")
     m.srows.observeField("rowItemSelected", "onPick")
+    m.recent = m.top.findNode("recent")
+    m.recent.observeField("itemSelected", "onRecent")
     m.kb.observeField("itemSelected", "onKey")
     m.searchTimer.observeField("fire", "runSearch")
     m.q = ""
@@ -122,6 +124,7 @@ sub openTab(i)
     m.rows.visible = (i <> 2)
     m.status.visible = (i <> 2)
     setLoading(m.skel, false)
+    if i = 2 and m.q = "" then loadHistory()
     if i < 2 then
         s = m.sec[i]
         if s.root.getChildCount() = 0 then loadMore(i)   ' retry after an error
@@ -204,7 +207,7 @@ sub onSection(i, d)
     s = m.sec[i]
     s.task = invalid
     if d.error <> invalid then
-        s.err = "Ошибка ВК: " + d.error.error_msg   ' a later page failed: keep what we have, retry on scroll
+        s.err = "Ошибка ВК: " + d.error.error_msg + chr(10) + "Нажмите OK, чтобы повторить"   ' a later page failed: keep what we have, retry on scroll
     else
         resp = d.response
         if resp = invalid then resp = {}
@@ -261,7 +264,13 @@ end sub
 
 sub onResult(e)
     r = e.getData()
-    if r.tag <> "search" then
+    if r.tag = "hist" then
+        showHistory(r.data)
+        return
+    else if r.tag = "histadd" then
+        loadHistory()   ' VK has moved the query to the top of its list
+        return
+    else if r.tag <> "search" then
         i = r.tag.right(1).toInt()
         ' drop pages of a section that was reset (new tokens) meanwhile
         if m.sec[i].task <> invalid and e.getRoSGNode().isSameNode(m.sec[i].task) then onSection(i, r.data)
@@ -377,11 +386,43 @@ sub onKey()
     else if k = "Пробел" then
         m.q = m.q + " "
     else
-        m.q = m.q + LCase(k)
+        if k = "Ё" then k = "ё" else k = LCase(k)   ' LCase maps Ё (U+0401) to С (U+0421)
+        m.q = m.q + k
     end if
-    m.queryLbl.text = m.q
+    setQuery(m.q)
     m.searchTimer.control = "stop"
     m.searchTimer.control = "start"
+end sub
+
+sub setQuery(q)
+    m.q = q
+    m.queryLbl.text = q
+    m.top.findNode("qph").visible = (q = "")
+end sub
+
+' VK search history ("Недавние"), read with the official token; VK has no method to delete it
+sub loadHistory()
+    if m.token <> "" then m.hist = call("catalog.getVideoSearch", {}, "hist")
+end sub
+
+sub showHistory(d)
+    c = CreateObject("roSGNode", "ContentNode")
+    if d.response <> invalid and d.response.suggestions <> invalid then
+        for each sg in d.response.suggestions
+            if c.getChildCount() < 8 and sg.type = "recent" and sg.title <> invalid then c.createChild("ContentNode").title = sg.title
+        end for
+    end if
+    has = c.getChildCount() > 0
+    if m.recent.hasFocus() and not has then m.kb.setFocus(true)
+    m.recent.content = c
+    m.recent.visible = has
+    m.top.findNode("recentHdr").visible = has
+end sub
+
+sub onRecent()
+    setQuery(m.recent.content.getChild(m.recent.itemSelected).title)
+    m.searchTimer.control = "stop"
+    runSearch()
 end sub
 
 sub runSearch()
@@ -391,6 +432,15 @@ sub runSearch()
     m.srows.content = invalid
     setLoading(m.sskel, true)
     m.task = call("video.search", {q: q, count: 60, adult: 0, sort: 2}, "search")
+    m.shown = q
+end sub
+
+' Search runs live while typing, so the query goes to VK search history only once the user commits to it
+' (moves into the results or plays one). The official-token call records it; its results have no files.
+sub recordQuery()
+    if m.shown = invalid or m.shown = m.recorded then return
+    m.recorded = m.shown
+    m.histAdd = call("catalog.getVideoSearch", {q: m.shown, need_blocks: 1}, "histadd")
 end sub
 
 sub focusKb()
@@ -402,6 +452,7 @@ end sub
 ' ---------- playback: 1080p, drop to 720p after 2 real rebuffers; never below 720p (user requirement) ----------
 sub onPick(e)
     m.list = e.getRoSGNode()
+    if m.list.isSameNode(m.srows) then recordQuery()
     sel = m.list.rowItemSelected
     m.cur = m.list.content.getChild(sel[0]).getChild(sel[1]).v
     k = "mp4_720"
@@ -412,6 +463,7 @@ end sub
 
 sub play(k, startAt)
     m.quality = k
+    m.failed = false
     m.rebuf = 0
     m.prev = ""
     c = CreateObject("roSGNode", "ContentNode")
@@ -440,7 +492,8 @@ sub showOsd()
 end sub
 
 sub hideOsd()
-    if m.video.state = "paused" or m.target >= 0 then return
+    st = m.video.state
+    if m.failed or st = "paused" or st = "buffering" or m.target >= 0 then return
     m.osd.visible = false
 end sub
 
@@ -452,10 +505,13 @@ sub drawOsd()
     if d > 0 then w = Int(1728 * p / d)
     m.top.findNode("osdFill").width = w
     m.top.findNode("osdPos").text = clock(p)
-    m.top.findNode("osdDur").text = clock(d)
+    m.top.findNode("osdDur").text = ""
+    if d > 0 then m.top.findNode("osdDur").text = clock(d)
     icon = ""
     if m.video.state = "paused" then icon = "Пауза"
     if m.video.state = "buffering" then icon = "Загрузка…"
+    if m.target >= 0 then icon = "Перемотка"
+    if m.failed then icon = "Ошибка"
     m.top.findNode("osdIcon").text = icon
 end sub
 
@@ -538,13 +594,18 @@ sub onVideoState()
             return
         end if
     else if st = "error" then
-        closeVideo()
-        m.status.text = "Ошибка воспроизведения: " + m.video.errorMsg
+        if m.quality = "mp4_1080" and m.cur.files.mp4_720 <> invalid then
+            play("mp4_720", m.video.position)   ' still >= 720p
+            return
+        end if
+        m.failed = true   ' keep the player open with the reason; Back returns to the list
+        m.top.findNode("osdTitle").text = "Не удалось воспроизвести видео"
+        showOsd()
     else if st = "finished" then
         closeVideo()
     end if
     m.prev = st
-    if m.osd.visible then drawOsd()
+    if st = "buffering" or (st = "playing" and m.osd.visible) then showOsd() else if m.osd.visible then drawOsd()   ' re-arm auto-hide once loading ends
 end sub
 
 sub closeVideo()
@@ -570,6 +631,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
             openTab(m.tab + 1)
         else if (key = "OK" or key = "down") and m.tab = 2 then
             focusKb()
+        else if (key = "OK" or key = "down") and m.rows.content = invalid then
+            openTab(m.tab)   ' error / empty: retry
         else if key = "down" and m.rows.content <> invalid then
             m.inTabs = false
             paintTabs()
@@ -580,8 +643,18 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.kb.hasFocus() then
         if key = "up" or key = "back" then
             toTabs()
+        else if key = "down" and m.recent.visible then
+            m.recent.setFocus(true)
         else if key = "right" and m.srows.content <> invalid then
-            m.srows.setFocus(true)
+            focusResults()
+        end if
+        return true
+    end if
+    if m.recent.hasFocus() then
+        if key = "up" or key = "back" then
+            m.kb.setFocus(true)
+        else if key = "right" and m.srows.content <> invalid then
+            focusResults()
         end if
         return true
     end if
@@ -599,3 +672,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub focusResults()
+    m.srows.setFocus(true)
+    recordQuery()
+end sub

@@ -8,7 +8,7 @@ TV=${TV:-192.168.0.3}
 RELAY=${RELAY:-https://relay.example.com}
 KEY=$(security find-generic-password -a ohld -s vk-roku-relay-key -w)
 printf 'function relayDefault() as string\n    return "%s/%s/"\nend function\n' "$RELAY" "$KEY" > components/Config.brs
-rm -f vkroku.zip && zip -qr vkroku.zip manifest source components
+rm -f vkroku.zip && zip -qr vkroku.zip manifest source components images
 echo "packaged vkroku.zip"
 if [ "${1:-}" = install ]; then
   PASS=$(security find-generic-password -a rokudev -s vk-roku-dev-installer -w)

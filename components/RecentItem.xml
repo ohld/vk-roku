@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- one "Недавние" search history row under the keyboard -->
+<component name="RecentItem" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContent" />
+    <field id="focusPercent" type="float" onChange="onFocus" />
+    <field id="gridHasFocus" type="boolean" onChange="onFocus" />
+  </interface>
+  <children>
+    <Rectangle id="bg" width="540" height="48" color="0x00000000" />
+    <Label id="lbl" translation="[20,0]" width="500" height="48" vertAlign="center" color="0xB8BBC0FF">
+      <Font role="font" uri="font:SystemFontFile" size="24" />
+    </Label>
+  </children>
+  <script type="text/brightscript"><![CDATA[
+    sub onContent()
+      m.top.findNode("lbl").text = m.top.itemContent.title
+    end sub
+    sub onFocus()
+      if m.top.gridHasFocus and m.top.focusPercent > 0.5 then
+        m.top.findNode("bg").color = "0xFFFFFFFF"
+        m.top.findNode("lbl").color = "0x0A0A0AFF"
+      else
+        m.top.findNode("bg").color = "0x00000000"
+        m.top.findNode("lbl").color = "0xB8BBC0FF"
+      end if
+    end sub
+  ]]></script>
+</component>
