@@ -1,6 +1,6 @@
 ' VK Видео for Roku. Layout follows the official VK Video Android TV app: dark #0A0A0A, 16:9 cards.
-' All VK API and video traffic goes through our relay (relay.py on Hetzner, URL baked in by deploy.sh):
-' Brazil -> RU VK CDN direct is ~2 Mbit/s, and VK video URLs are bound to the IP that called the API.
+' Optional relay (relay.py, URL baked in by deploy.sh): when set, all VK API and video traffic goes through it,
+' because VK video URLs are bound to the IP that called the API. Empty relay = direct connections.
 sub init()
     m.reg = CreateObject("roRegistrySection", "vk")
     m.token = m.reg.Read("token")      ' official VK Android token: catalog For you / Trending
@@ -641,7 +641,7 @@ end sub
 '  HLS starts in ~1 segment over one kept-alive connection; progressive mp4 makes Roku open ~6 sequential
 '  TLS connections across the ocean (11-14 s). The relay strips HLS variants below 720p and above 1080p.
 function firstQuality() as string
-    if m.cur.files.hls <> invalid then return "hls"   ' relay answers with the 1080p media playlist (Roku stalls on VK masters)
+    if m.relay <> "" and m.cur.files.hls <> invalid then return "hls"   ' relay answers with the 1080p media playlist (Roku stalls on VK masters)
     if m.cur.files.mp4_1080 <> invalid then return "mp4_1080"
     return "mp4_720"
 end function

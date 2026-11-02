@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """VK relay for the Roku VK app (Roku OS has no VPN). The TV requests
   GET /<KEY>/https://<vk host>/<path>?<query>
-and this server fetches it from VK (fast path from a Hetzner box) and streams it back with Range support.
+and this server fetches it from VK (a server with a good route to VK) and streams it back with Range support.
 Only VK hosts are allowed and a secret KEY is required, so this is not an open proxy.
 Env: RELAY_KEY (required), PORT (default 8787)."""
 import http.client, http.server, os, re, time, shutil, urllib.error, urllib.parse, urllib.request
@@ -37,7 +37,7 @@ class VKOnlyRedirects(urllib.request.HTTPRedirectHandler):
 
 
 class FastConnect(http.client.HTTPSConnection):
-    """~1 in 9 new Hetzner->VK connections hang in the TCP/TLS handshake (any VK IP; normal RTT 60 ms):
+    """~1 in 9 new server->VK connections hang in the TCP/TLS handshake (any VK IP; normal RTT 60 ms):
     give the handshake 1.5 s so fetch() can retry, then allow 30 s for VK to answer and stream."""
     def connect(self):
         self.timeout = 1.5
